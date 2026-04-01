@@ -8,12 +8,6 @@ export const registerUser = async (req, res) => {
     const { name, email, phone, password, role } = req.body;
 
     // Validation
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide all required fields",
-      });
-    }
 
     // Check existing user
     let user = await User.findOne({ $or: [{ email }, { phone }] });
