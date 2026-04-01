@@ -36,7 +36,7 @@ import {
   getRegDietPlanByMember,
   updateRegDietPlan,
   deleteRegDietPlan,
-} from "../controllers/Regdietplancontroller.js";
+} from "../controllers/regDietPlanController.js";
 
 import {
   createTrainer,

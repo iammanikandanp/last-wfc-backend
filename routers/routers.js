@@ -74,7 +74,7 @@ import {
   getRegWorkoutPlanByMember,
   updateRegWorkoutPlan,
   deleteRegWorkoutPlan,
-} from "../controllers/Regworkoutplancontroller.js";
+} from "../controllers/regWorkoutPlanController.js";
  
 const router = express.Router();
 
