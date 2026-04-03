@@ -11,6 +11,7 @@ export const register = async (req, res) => {
       sugarLevel, bloodPressure, attendanceId = "",
       personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = ""
     } = req.body;
+    console.log("Register body:", req.body);
 
     console.log("Register Request body:", req.body);
     console.log("Register Request files:", req.files);
@@ -55,6 +56,7 @@ export const fetch = async (req, res) => {
   try {
     const fetchAll = await Registration.find({});
     res.status(200).json({ message: "fetch all data", data: fetchAll });
+    console.log("Fetched all registrations:", fetchAll.length);
   } catch (err) {
     console.log("fetch error:", err);
     res.status(500).json({ message: "Internal Server Error", error: err.message });

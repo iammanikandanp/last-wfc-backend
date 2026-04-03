@@ -88,7 +88,12 @@ export const getAllAttendance = async (req, res) => {
 // ── Get attendance for one registration member ────────────────────────────────
 export const getAttendanceByRegistration = async (req, res) => {
   try {
-    const records = await XlsAttendance.find({ registrationId: req.params.id })
+    const reg = await Registration.findById(req.params.id, { attendanceId: 1 });
+    if (!reg?.attendanceId) {
+      return res.status(200).json({ success: true, records: [] });
+    }
+
+    const records = await XlsAttendance.find({ attendanceId: String(reg.attendanceId) })
       .sort({ month: -1 });
     return res.status(200).json({ success: true, records });
   } catch (err) {
@@ -114,10 +119,19 @@ export const linkAttendanceId = async (req, res) => {
       return res.status(400).json({ success: false, message: "registrationId and attendanceId required" });
     }
 
+    // Unlink records from the old attendanceId before re-linking
+    const oldReg = await Registration.findById(registrationId, { attendanceId: 1 });
+    if (oldReg?.attendanceId && String(oldReg.attendanceId) !== String(attendanceId)) {
+      await XlsAttendance.updateMany(
+        { attendanceId: String(oldReg.attendanceId), registrationId },
+        { registrationId: null }
+      );
+    }
+
     // Set attendanceId on Registration
     await Registration.findByIdAndUpdate(registrationId, { attendanceId: String(attendanceId) });
 
-    // Re-link all existing XlsAttendance records for this attendanceId
+    // Link all existing XlsAttendance records for this attendanceId
     const updated = await XlsAttendance.updateMany(
       { attendanceId: String(attendanceId) },
       { registrationId }

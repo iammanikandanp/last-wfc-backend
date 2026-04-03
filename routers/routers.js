@@ -50,6 +50,8 @@
 // router.put("/member-workout/:id/day/:dayId",       updateWorkoutDay);
 // router.delete("/member-workout/:id",               deleteWorkout);
 
+// NOTE: These routes have been implemented in apiRoutes.js
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPLETE routers.js snippet (ready to paste):
 // ─────────────────────────────────────────────────────────────────────────────
