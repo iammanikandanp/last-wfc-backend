@@ -40,6 +40,7 @@ import {
   linkAttendanceId,
 } from "../controllers/xlsAttendanceController.js";
 import { sendInvoiceEmail } from "../controllers/emailController.js";
+import { uploadInvoicePdf, pdfUpload } from "../controllers/uploadPdfController.js";
 import {
   createLead,
   getAllLeads,
@@ -170,5 +171,8 @@ router.delete("/leads/:id", deleteLead);
 
 // ── Email ─────────────────────────────────────────────────────────────────────
 router.post("/send-email", sendInvoiceEmail);
+
+// ── PDF Upload (signed Cloudinary upload via backend) ─────────────────────────
+router.post("/upload-pdf", pdfUpload.single("file"), uploadInvoicePdf);
 
 export default router;
