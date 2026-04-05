@@ -2,9 +2,14 @@
 // Proxies a Google Sheet CSV export to avoid browser CORS restrictions.
 
 const toGSheetCsvUrl = (url) => {
-  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!m) throw new Error("Invalid Google Sheet URL");
-  return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=0`;
+  const idMatch  = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!idMatch) throw new Error("Invalid Google Sheet URL");
+
+  // Extract gid from ?gid=... or #gid=...
+  const gidMatch = url.match(/[?&#]gid=(\d+)/);
+  const gid      = gidMatch ? gidMatch[1] : "0";
+
+  return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
 };
 
 export const proxyGSheetCSV = async (req, res) => {
@@ -20,19 +25,16 @@ export const proxyGSheetCSV = async (req, res) => {
 
   try {
     const response = await fetch(csvUrl, {
-      headers: { "User-Agent": "Mozilla/5.0" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; WFC-Bot/1.0)",
+        "Accept":     "text/csv,text/plain,*/*",
+      },
       redirect: "follow",
     });
 
-    if (!response.ok) {
-      return res.status(502).json({
-        success: false,
-        message: "Failed to fetch sheet — make sure it is shared as 'Anyone with link can view'",
-      });
-    }
-
     const contentType = response.headers.get("content-type") || "";
-    // If Google redirected to a login page (HTML), the sheet is not public
+
+    // Google redirects to login page (HTML) when sheet is not public
     if (contentType.includes("text/html")) {
       return res.status(403).json({
         success: false,
@@ -40,7 +42,18 @@ export const proxyGSheetCSV = async (req, res) => {
       });
     }
 
+    if (!response.ok) {
+      return res.status(502).json({
+        success: false,
+        message: `Google returned status ${response.status} — make sure the sheet is shared as 'Anyone with link can view'`,
+      });
+    }
+
     const csv = await response.text();
+    if (!csv.trim()) {
+      return res.status(422).json({ success: false, message: "Sheet returned empty content" });
+    }
+
     res.setHeader("Content-Type", "text/csv");
     res.send(csv);
   } catch (err) {
