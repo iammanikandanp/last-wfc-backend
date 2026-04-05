@@ -42,8 +42,9 @@ const regDietPlanSchema = new mongoose.Schema({
   // Supplements
   supplements: [{ type: String }],
 
-  notes:    { type: String, default: "" },
-  isActive: { type: Boolean, default: true },
+  notes:      { type: String, default: "" },
+  gsheetLink: { type: String, default: "" },
+  isActive:   { type: Boolean, default: true },
 }, { timestamps: true });
 
 export const RegDietPlan = mongoose.model("RegDietPlan", regDietPlanSchema);

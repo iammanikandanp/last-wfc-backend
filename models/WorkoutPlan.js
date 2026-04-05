@@ -45,8 +45,9 @@ const regWorkoutPlanSchema = new mongoose.Schema({
   saturday:  { type: daySchema, default: {} },
 
   totalWeeklyCalories: { type: Number, default: 0 },
-  notes:    { type: String, default: "" },
-  isActive: { type: Boolean, default: true },
+  notes:      { type: String, default: "" },
+  gsheetLink: { type: String, default: "" },
+  isActive:   { type: Boolean, default: true },
 }, { timestamps: true });
 
 export const RegWorkoutPlan = mongoose.model("RegWorkoutPlan", regWorkoutPlanSchema);
