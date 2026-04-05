@@ -38,6 +38,7 @@ import {
   getAttendanceByRegistration,
   getAvailableMonths,
   linkAttendanceId,
+  deleteAllAttendance,
 } from "../controllers/xlsAttendanceController.js";
 import { sendInvoiceEmail } from "../controllers/emailController.js";
 import { uploadInvoicePdf, pdfUpload } from "../controllers/uploadPdfController.js";
@@ -63,6 +64,14 @@ import {
   updateRegWorkoutPlan,
   deleteRegWorkoutPlan,
 } from "../controllers/regWorkoutPlanController.js";
+import {
+  importWorkoutCSV,
+  getWorkoutByMember,
+  getAllWorkoutsByMember,
+  updateWorkout,
+  updateWorkoutDay,
+  deleteWorkout,
+} from "../controllers/memberWorkoutController.js";
 
 const router = express.Router();
 
@@ -161,6 +170,15 @@ router.get("/xls-attendance",            getAllAttendance);
 router.get("/xls-attendance/months",     getAvailableMonths);
 router.get("/xls-attendance/member/:id", getAttendanceByRegistration);
 router.post("/xls-attendance/link",      linkAttendanceId);
+router.delete("/xls-attendance",         deleteAllAttendance);
+
+// ── Member Workout CSV ────────────────────────────────────────────────────────
+router.post("/member-workout/import",              csvUpload.single("file"), importWorkoutCSV);
+router.get("/member-workout/member/:memberId",     getWorkoutByMember);
+router.get("/member-workout/member/:memberId/all", getAllWorkoutsByMember);
+router.put("/member-workout/:id",                  updateWorkout);
+router.put("/member-workout/:id/day/:dayId",       updateWorkoutDay);
+router.delete("/member-workout/:id",               deleteWorkout);
 
 // ── Leads ─────────────────────────────────────────────────────────────────────
 router.post("/leads",       createLead);

@@ -111,6 +111,20 @@ export const getAvailableMonths = async (req, res) => {
   }
 };
 
+// ── Delete all attendance records ────────────────────────────────────────────
+export const deleteAllAttendance = async (req, res) => {
+  try {
+    const result = await XlsAttendance.deleteMany({});
+    return res.status(200).json({
+      success: true,
+      message: `Deleted ${result.deletedCount} attendance records.`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // ── Link a Registration to an attendanceId (set attendanceId on Registration) ──
 export const linkAttendanceId = async (req, res) => {
   try {
