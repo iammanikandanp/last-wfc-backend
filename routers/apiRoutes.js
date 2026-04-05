@@ -72,6 +72,7 @@ import {
   updateWorkoutDay,
   deleteWorkout,
 } from "../controllers/memberWorkoutController.js";
+import { proxyGSheetCSV } from "../controllers/gsheetProxyController.js";
 
 const router = express.Router();
 
@@ -163,6 +164,9 @@ router.get("/reg-workout-plans",            getAllRegWorkoutPlans);
 router.get("/reg-workout-plans/member/:id", getRegWorkoutPlanByMember);
 router.put("/reg-workout-plans/:id",        updateRegWorkoutPlan);
 router.delete("/reg-workout-plans/:id",     deleteRegWorkoutPlan);
+
+// ── Google Sheet CSV Proxy ────────────────────────────────────────────────────
+router.get("/proxy/gsheet-csv", proxyGSheetCSV);
 
 // ── Attendance ────────────────────────────────────────────────────────────────
 router.post("/xls-attendance/import",    importAttendance);
