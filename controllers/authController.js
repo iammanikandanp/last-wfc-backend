@@ -1,4 +1,5 @@
 import { User } from "../models/User.js";
+import { Registration } from "../models/registration.js";
 import { generateToken } from "../utils/helpers.js";
 import crypto from "crypto";
 
@@ -18,6 +19,13 @@ export const registerUser = async (req, res) => {
       });
     }
 
+    // Auto-link: check if a gym Registration exists with the same phone
+    let registrationId = null;
+    if (phone) {
+      const existing = await Registration.findOne({ phone });
+      if (existing) registrationId = existing._id;
+    }
+
     // Create user
     user = new User({
       name,
@@ -25,6 +33,7 @@ export const registerUser = async (req, res) => {
       phone,
       password,
       role: role || "member",
+      registrationId,
     });
 
     await user.save();
@@ -42,6 +51,8 @@ export const registerUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        canManagePayments: user.canManagePayments,
+        registrationId: user.registrationId,
       },
     });
   } catch (error) {
@@ -95,6 +106,15 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    // If registrationId not yet linked, try to auto-link now
+    if (!user.registrationId && user.phone) {
+      const gymReg = await Registration.findOne({ phone: user.phone });
+      if (gymReg) {
+        user.registrationId = gymReg._id;
+        await user.save({ validateModifiedOnly: true });
+      }
+    }
+
     // Generate token
     const token = generateToken(user._id);
 
@@ -108,6 +128,8 @@ export const loginUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        canManagePayments: user.canManagePayments,
+        registrationId: user.registrationId,
       },
     });
   } catch (error) {
@@ -137,21 +159,21 @@ export const getCurrentUser = async (req, res) => {
 // Forgot Password - Generate token
 export const forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, phone } = req.body;
 
-    if (!email) {
+    if (!email && !phone) {
       return res.status(400).json({
         success: false,
-        message: "Please provide email",
+        message: "Please provide email or phone",
       });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])] });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "No account found with this email or phone",
       });
     }
 

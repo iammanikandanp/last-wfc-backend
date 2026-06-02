@@ -38,6 +38,15 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    registrationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Registration",
+      default: null,
+    },
+    canManagePayments: {
+      type: Boolean,
+      default: false,
+    },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
   },

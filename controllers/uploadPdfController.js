@@ -22,12 +22,12 @@ export const uploadInvoicePdf = async (req, res) => {
       return res.status(400).json({ success: false, message: "No PDF file provided" });
     }
 
-    const rawName = (req.body.fileName || `invoice-${Date.now()}`).replace(/\.pdf$/i, "").replace(/\s+/g, "-");
-    const publicId = `wfc-invoices/${rawName}`;
+    const rawName = (req.body.fileName || `invoice-${Date.now()}`).replace(/\.pdf$/i, "").replace(/[^a-zA-Z0-9._-]/g, "-");
+    const publicId = `wfc-invoices/${rawName}.pdf`;
 
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { resource_type: "raw", folder: "wfc-invoices", public_id: publicId },
+        { resource_type: "raw", public_id: publicId },
         (error, result) => {
           if (error) reject(error);
           else resolve(result);

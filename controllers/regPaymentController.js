@@ -96,6 +96,13 @@ export const getAllRegPayments = async (req, res) => {
 // ── Get Payments by Member ────────────────────────────────────────────────────
 export const getRegPaymentsByMember = async (req, res) => {
   try {
+    if (
+      req.user.role === "member" &&
+      (!req.user.registrationId || req.user.registrationId.toString() !== req.params.id)
+    ) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
     const payments = await RegPayment.find({ registrationId: req.params.id })
       .sort({ createdAt: -1 });
 

@@ -1,4 +1,5 @@
 import { Registration } from "../models/registration.js";
+import { User } from "../models/User.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 export const register = async (req, res) => {
@@ -43,6 +44,14 @@ export const register = async (req, res) => {
     });
 
     const savedUser = await newUser.save();
+
+    // Auto-link: if a User account exists with the same phone, set their registrationId
+    if (phone) {
+      await User.findOneAndUpdate(
+        { phone, registrationId: null },
+        { registrationId: savedUser._id }
+      );
+    }
 
     return res.status(200).json({ message: "Registered successfully!", data: savedUser });
   } catch (err) {
@@ -140,6 +149,14 @@ export const deletereg = async (req, res) => {
 export const fetchOne = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (
+      req.user.role === "member" &&
+      (!req.user.registrationId || req.user.registrationId.toString() !== id)
+    ) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
     const user = await Registration.findById(id);
     if (!user) return res.status(404).json({ message: "Member not found" });
     res.status(200).json({ message: "fetch one data", data: user });

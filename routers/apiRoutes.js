@@ -42,6 +42,7 @@ import {
 } from "../controllers/xlsAttendanceController.js";
 import { sendInvoiceEmail } from "../controllers/emailController.js";
 import { uploadInvoicePdf, pdfUpload } from "../controllers/uploadPdfController.js";
+import { viewInvoice } from "../controllers/invoiceViewController.js";
 import {
   createLead,
   getAllLeads,
@@ -99,6 +100,9 @@ router.post("/auth/login",          loginUser);
 router.post("/auth/forgot-password", forgotPassword);
 router.post("/auth/reset-password", resetPassword);
 
+// ── Public invoice viewer (shared via WhatsApp) ───────────────────────────────
+router.get("/invoice/:id", viewInvoice);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PROTECTED ROUTES  (Bearer token required on every request below)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +116,7 @@ router.get("/auth/users",           authorize("admin"), getAllUsers);
 // ── Registration ──────────────────────────────────────────────────────────────
 router.post(
   "/register",
+  authorize("admin", "trainer"),
   parser.fields([
     { name: "profileImage",   maxCount: 1 },
     { name: "frontBodyImage", maxCount: 1 },
@@ -120,10 +125,11 @@ router.post(
   ]),
   register
 );
-router.get("/fetch",        fetch);
-router.get("/fetchone/:id", fetchOne);
+router.get("/fetch",        authorize("admin", "trainer"), fetch);
+router.get("/fetchone/:id", fetchOne);   // controller enforces member ownership
 router.post(
   "/update/:id",
+  authorize("admin", "trainer"),
   parser.fields([
     { name: "profileImage",   maxCount: 1 },
     { name: "frontBodyImage", maxCount: 1 },
@@ -132,69 +138,77 @@ router.post(
   ]),
   updatereg
 );
-router.post("/delete/:id", deletereg);
+router.post("/delete/:id", authorize("admin"), deletereg);
 
 // ── Payments ──────────────────────────────────────────────────────────────────
-router.post("/reg-payments",                createRegPayment);
-router.get("/reg-payments",                 getAllRegPayments);
-router.get("/reg-payments/revenue/summary", getRevenueSummary);
-router.get("/reg-payments/member/:id",      getRegPaymentsByMember);
-router.patch("/reg-payments/pdf/:id",       patchPdfUrl);
-router.put("/reg-payments/:id",             updateRegPayment);
-router.delete("/reg-payments/:id",          deleteRegPayment);
+router.post("/reg-payments", (req, res, next) => {
+  if (req.user.role === "admin") return next();
+  if (req.user.role === "trainer" && req.user.canManagePayments) return next();
+  return res.status(403).json({ success: false, message: "Not authorized to create payments" });
+}, createRegPayment);
+router.get("/reg-payments",                 authorize("admin", "trainer"), getAllRegPayments);
+router.get("/reg-payments/revenue/summary", authorize("admin"),            getRevenueSummary);
+router.get("/reg-payments/member/:id",      getRegPaymentsByMember);  // controller enforces member ownership
+router.patch("/reg-payments/pdf/:id",       authorize("admin", "trainer"), patchPdfUrl);
+router.put("/reg-payments/:id", (req, res, next) => {
+  if (req.user.role === "admin") return next();
+  if (req.user.role === "trainer" && req.user.canManagePayments) return next();
+  return res.status(403).json({ success: false, message: "Not authorized to update payments" });
+}, updateRegPayment);
+router.delete("/reg-payments/:id",          authorize("admin"), deleteRegPayment);
 
 // ── RegDiet Plans ─────────────────────────────────────────────────────────────
-router.post("/reg-diet-plans",           createRegDietPlan);
-router.get("/reg-diet-plans",            getAllRegDietPlans);
+router.post("/reg-diet-plans",           authorize("admin", "trainer"), createRegDietPlan);
+router.get("/reg-diet-plans",            authorize("admin", "trainer"), getAllRegDietPlans);
 router.get("/reg-diet-plans/member/:id", getRegDietPlanByMember);
-router.put("/reg-diet-plans/:id",        updateRegDietPlan);
-router.delete("/reg-diet-plans/:id",     deleteRegDietPlan);
+router.put("/reg-diet-plans/:id",        authorize("admin", "trainer"), updateRegDietPlan);
+router.delete("/reg-diet-plans/:id",     authorize("admin", "trainer"), deleteRegDietPlan);
 
 // ── Member Diet CSV ───────────────────────────────────────────────────────────
-router.post("/member-diet/import",              csvUpload.single("file"), importDietCSV);
+router.post("/member-diet/import",              authorize("admin", "trainer"), csvUpload.single("file"), importDietCSV);
 router.get("/member-diet/member/:memberId",     getDietByMember);
 router.get("/member-diet/member/:memberId/all", getAllDietsByMember);
-router.put("/member-diet/:id",                  updateDiet);
-router.put("/member-diet/:id/day/:dayId",       updateDietDay);
-router.delete("/member-diet/:id",               deleteDiet);
+router.put("/member-diet/:id",                  authorize("admin", "trainer"), updateDiet);
+router.put("/member-diet/:id/day/:dayId",       authorize("admin", "trainer"), updateDietDay);
+router.delete("/member-diet/:id",               authorize("admin", "trainer"), deleteDiet);
 
 // ── RegWorkout Plans ──────────────────────────────────────────────────────────
-router.post("/reg-workout-plans",           createRegWorkoutPlan);
-router.get("/reg-workout-plans",            getAllRegWorkoutPlans);
+router.post("/reg-workout-plans",           authorize("admin", "trainer"), createRegWorkoutPlan);
+router.get("/reg-workout-plans",            authorize("admin", "trainer"), getAllRegWorkoutPlans);
 router.get("/reg-workout-plans/member/:id", getRegWorkoutPlanByMember);
-router.put("/reg-workout-plans/:id",        updateRegWorkoutPlan);
-router.delete("/reg-workout-plans/:id",     deleteRegWorkoutPlan);
+router.put("/reg-workout-plans/:id",        authorize("admin", "trainer"), updateRegWorkoutPlan);
+router.delete("/reg-workout-plans/:id",     authorize("admin", "trainer"), deleteRegWorkoutPlan);
 
 // ── Google Sheet CSV Proxy ────────────────────────────────────────────────────
 router.get("/proxy/gsheet-csv", proxyGSheetCSV);
 
 // ── Attendance ────────────────────────────────────────────────────────────────
-router.post("/xls-attendance/import",    importAttendance);
-router.get("/xls-attendance",            getAllAttendance);
-router.get("/xls-attendance/months",     getAvailableMonths);
+router.post("/xls-attendance/import",    authorize("admin", "trainer"), importAttendance);
+router.get("/xls-attendance",            authorize("admin", "trainer"), getAllAttendance);
+router.get("/xls-attendance/months",     authorize("admin", "trainer"), getAvailableMonths);
 router.get("/xls-attendance/member/:id", getAttendanceByRegistration);
-router.post("/xls-attendance/link",      linkAttendanceId);
-router.delete("/xls-attendance",         deleteAllAttendance);
+router.post("/xls-attendance/link",      authorize("admin", "trainer"), linkAttendanceId);
+router.delete("/xls-attendance",         authorize("admin"),            deleteAllAttendance);
 
 // ── Member Workout CSV ────────────────────────────────────────────────────────
-router.post("/member-workout/import",              csvUpload.single("file"), importWorkoutCSV);
+router.post("/member-workout/import",              authorize("admin", "trainer"), csvUpload.single("file"), importWorkoutCSV);
 router.get("/member-workout/member/:memberId",     getWorkoutByMember);
 router.get("/member-workout/member/:memberId/all", getAllWorkoutsByMember);
-router.put("/member-workout/:id",                  updateWorkout);
-router.put("/member-workout/:id/day/:dayId",       updateWorkoutDay);
-router.delete("/member-workout/:id",               deleteWorkout);
+router.put("/member-workout/:id",                  authorize("admin", "trainer"), updateWorkout);
+router.put("/member-workout/:id/day/:dayId",       authorize("admin", "trainer"), updateWorkoutDay);
+router.delete("/member-workout/:id",               authorize("admin", "trainer"), deleteWorkout);
 
 // ── Leads ─────────────────────────────────────────────────────────────────────
-router.post("/leads",       createLead);
-router.get("/leads/stats",  getLeadStats);
-router.get("/leads",        getAllLeads);
-router.put("/leads/:id",    updateLead);
-router.delete("/leads/:id", deleteLead);
+router.post("/leads",       authorize("admin", "trainer"), createLead);
+router.get("/leads/stats",  authorize("admin", "trainer"), getLeadStats);
+router.get("/leads",        authorize("admin", "trainer"), getAllLeads);
+router.put("/leads/:id",    authorize("admin", "trainer"), updateLead);
+router.delete("/leads/:id", authorize("admin"),            deleteLead);
 
 // ── Email ─────────────────────────────────────────────────────────────────────
-router.post("/send-email", sendInvoiceEmail);
+router.post("/send-email", authorize("admin", "trainer"), sendInvoiceEmail);
 
 // ── PDF Upload (signed Cloudinary upload via backend) ─────────────────────────
-router.post("/upload-pdf", pdfUpload.single("file"), uploadInvoicePdf);
+router.post("/upload-pdf", authorize("admin", "trainer"), pdfUpload.single("file"), uploadInvoicePdf);
 
 export default router;
