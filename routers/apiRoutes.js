@@ -74,8 +74,32 @@ import {
   deleteWorkout,
 } from "../controllers/memberWorkoutController.js";
 import { proxyGSheetCSV } from "../controllers/gsheetProxyController.js";
+import {
+  createExpense,
+  getAllExpenses,
+  getExpenseById,
+  updateExpense,
+  deleteExpense,
+  getExpenseSummary,
+} from "../controllers/expenseController.js";
+import {
+  createCategory,
+  getAllCategories,
+  updateCategory,
+  deleteCategory,
+} from "../controllers/expenseCategoryController.js";
 
 const router = express.Router();
+
+// Multer for receipt image uploads (memory storage → manual Cloudinary upload)
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(jpeg|jpg|png|webp|gif)$/i.test(file.mimetype);
+    ok ? cb(null, true) : cb(new Error("Only image files are allowed for receipts"), false);
+  },
+});
 
 // CSV files → in-memory buffer
 const csvUpload = multer({
@@ -210,5 +234,19 @@ router.post("/send-email", authorize("admin", "trainer"), sendInvoiceEmail);
 
 // ── PDF Upload (signed Cloudinary upload via backend) ─────────────────────────
 router.post("/upload-pdf", authorize("admin", "trainer"), pdfUpload.single("file"), uploadInvoicePdf);
+
+// ── Expense Categories ────────────────────────────────────────────────────────
+router.post("/expense-categories",       authorize("admin"), createCategory);
+router.get("/expense-categories",        authorize("admin"), getAllCategories);
+router.put("/expense-categories/:id",    authorize("admin"), updateCategory);
+router.delete("/expense-categories/:id", authorize("admin"), deleteCategory);
+
+// ── Expenses ──────────────────────────────────────────────────────────────────
+router.get("/expenses/summary",  authorize("admin"), getExpenseSummary);
+router.get("/expenses",          authorize("admin"), getAllExpenses);
+router.get("/expenses/:id",      authorize("admin"), getExpenseById);
+router.post("/expenses",         authorize("admin"), receiptUpload.single("receipt"), createExpense);
+router.put("/expenses/:id",      authorize("admin"), receiptUpload.single("receipt"), updateExpense);
+router.delete("/expenses/:id",   authorize("admin"), deleteExpense);
 
 export default router;
