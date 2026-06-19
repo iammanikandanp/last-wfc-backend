@@ -88,6 +88,19 @@ import {
   updateCategory,
   deleteCategory,
 } from "../controllers/expenseCategoryController.js";
+import {
+  createIncomeCategory,
+  getAllIncomeCategories,
+  updateIncomeCategory,
+  deleteIncomeCategory,
+} from "../controllers/incomeCategoryController.js";
+import {
+  createIncome,
+  getAllIncomes,
+  getIncomeById,
+  updateIncome,
+  deleteIncome,
+} from "../controllers/incomeController.js";
 
 const router = express.Router();
 
@@ -248,5 +261,18 @@ router.get("/expenses/:id",      authorize("admin"), getExpenseById);
 router.post("/expenses",         authorize("admin"), receiptUpload.single("receipt"), createExpense);
 router.put("/expenses/:id",      authorize("admin"), receiptUpload.single("receipt"), updateExpense);
 router.delete("/expenses/:id",   authorize("admin"), deleteExpense);
+
+// ── Income Categories ─────────────────────────────────────────────────────────
+router.post("/income-categories",       authorize("admin"), createIncomeCategory);
+router.get("/income-categories",        authorize("admin"), getAllIncomeCategories);
+router.put("/income-categories/:id",    authorize("admin"), updateIncomeCategory);
+router.delete("/income-categories/:id", authorize("admin"), deleteIncomeCategory);
+
+// ── Incomes ───────────────────────────────────────────────────────────────────
+router.get("/incomes",      authorize("admin"), getAllIncomes);
+router.get("/incomes/:id",  authorize("admin"), getIncomeById);
+router.post("/incomes",     authorize("admin"), createIncome);
+router.put("/incomes/:id",  authorize("admin"), updateIncome);
+router.delete("/incomes/:id", authorize("admin"), deleteIncome);
 
 export default router;
