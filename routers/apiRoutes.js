@@ -49,6 +49,8 @@ import {
   updateLead,
   deleteLead,
   getLeadStats,
+  getLeadStatuses,
+  createLeadStatus,
 } from "../controllers/leadController.js";
 import {
   importDietCSV,
@@ -101,6 +103,11 @@ import {
   updateIncome,
   deleteIncome,
 } from "../controllers/incomeController.js";
+import {
+  createBlockEntry,
+  getAllBlockEntries,
+  deleteBlockEntry,
+} from "../controllers/blockListController.js";
 
 const router = express.Router();
 
@@ -236,10 +243,12 @@ router.put("/member-workout/:id/day/:dayId",       authorize("admin", "trainer")
 router.delete("/member-workout/:id",               authorize("admin", "trainer"), deleteWorkout);
 
 // ── Leads ─────────────────────────────────────────────────────────────────────
-router.post("/leads",       authorize("admin", "trainer"), createLead);
+router.post("/leads",       authorize("admin", "trainer"), parser.single("profileImage"), createLead);
 router.get("/leads/stats",  authorize("admin", "trainer"), getLeadStats);
+router.get("/leads/statuses",  authorize("admin", "trainer"), getLeadStatuses);
+router.post("/leads/statuses", authorize("admin", "trainer"), createLeadStatus);
 router.get("/leads",        authorize("admin", "trainer"), getAllLeads);
-router.put("/leads/:id",    authorize("admin", "trainer"), updateLead);
+router.put("/leads/:id",    authorize("admin", "trainer"), parser.single("profileImage"), updateLead);
 router.delete("/leads/:id", authorize("admin"),            deleteLead);
 
 // ── Email ─────────────────────────────────────────────────────────────────────
@@ -274,5 +283,10 @@ router.get("/incomes/:id",  authorize("admin"), getIncomeById);
 router.post("/incomes",     authorize("admin"), createIncome);
 router.put("/incomes/:id",  authorize("admin"), updateIncome);
 router.delete("/incomes/:id", authorize("admin"), deleteIncome);
+
+// ── Block List ────────────────────────────────────────────────────────────────
+router.post("/block-list",       authorize("admin", "trainer"), createBlockEntry);
+router.get("/block-list",        authorize("admin", "trainer"), getAllBlockEntries);
+router.delete("/block-list/:id", authorize("admin", "trainer"), deleteBlockEntry);
 
 export default router;

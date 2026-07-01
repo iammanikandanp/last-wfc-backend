@@ -115,6 +115,7 @@ export const viewInvoice = async (req, res) => {
         <div>
           <div class="brand">WFC – Wolverine Fitness Club</div>
           <div class="brand-sub">Excellence in Fitness | Coimbatore, Tamil Nadu</div>
+          <div class="brand-sub">GSTIN: 33BOAPH6375A1ZF</div>
         </div>
         <div class="invoice-tag">
           <div class="label">INVOICE</div>

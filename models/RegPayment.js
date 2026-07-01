@@ -27,6 +27,7 @@ const regPaymentSchema = new mongoose.Schema(
     invoiceNo:   { type: String, unique: true },
     startDate:   { type: Date },
     endDate:     { type: Date },
+    issuedDate:  { type: Date },
     pdfUrl:        { type: String, default: "" }, // Cloudinary PDF URL
     paymentType:   { type: String, enum: ["full", "partly"], default: "full" },
     advanceAmount: { type: Number, default: 0 },  // amount paid now

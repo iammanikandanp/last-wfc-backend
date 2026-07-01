@@ -16,6 +16,7 @@ export const createRegPayment = async (req, res) => {
       balanceAmount,
       startDate,
       endDate,
+      issuedDate,
       invoiceNo,
       pdfUrl,
     } = req.body;
@@ -50,6 +51,7 @@ export const createRegPayment = async (req, res) => {
       invoiceNo,
       startDate:     startDate ? new Date(startDate) : new Date(),
       endDate:       endDate   ? new Date(endDate)   : null,
+      issuedDate:    issuedDate ? new Date(issuedDate) : new Date(),
       pdfUrl:        pdfUrl || "",
       transactionId: `TXN-${Date.now()}`,
     });
