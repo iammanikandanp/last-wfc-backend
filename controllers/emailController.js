@@ -58,6 +58,7 @@ const buildHTML = ({ memberName, invoiceNo, packageName, finalAmount, balanceAmo
   const rows = [
     ["Package : ",     packageName || "—"],
     ["Invoice No : ",  invoiceNo   || "—"],
+    ["GSTIN : ",       "33BOAPH6375A1ZF"],
     ["Start Date : ",  fmtDate(startDate)],
     ["End Date : ",    fmtDate(endDate)],
     ["Payment Mode : ",(paymentMode||"").toUpperCase()],

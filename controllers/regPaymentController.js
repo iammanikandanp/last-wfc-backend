@@ -1,5 +1,6 @@
 import { RegPayment } from "../models/RegPayment.js";
 import { Registration } from "../models/registration.js";
+import { recordAdmissionIncome } from "../utils/recordAdmissionIncome.js";
 
 // ── Create Payment ────────────────────────────────────────────────────────────
 export const createRegPayment = async (req, res) => {
@@ -14,6 +15,7 @@ export const createRegPayment = async (req, res) => {
       paymentType,
       advanceAmount,
       balanceAmount,
+      nextDueDate,
       startDate,
       endDate,
       issuedDate,
@@ -47,6 +49,7 @@ export const createRegPayment = async (req, res) => {
       paymentType:   paymentType || 'full',
       advanceAmount: Number(advanceAmount) || Number(finalAmount),
       balanceAmount: Number(balanceAmount) || 0,
+      nextDueDate:   paymentType === 'partly' && nextDueDate ? new Date(nextDueDate) : null,
       paymentStatus: "completed",
       invoiceNo,
       startDate:     startDate ? new Date(startDate) : new Date(),
@@ -66,6 +69,16 @@ export const createRegPayment = async (req, res) => {
         packages: pkg,
       });
     }
+
+    // Reflect the amount actually collected as Income → Admission
+    await recordAdmissionIncome({
+      amountPaid: payment.advanceAmount,
+      memberName: payment.memberName,
+      invoiceNo: payment.invoiceNo,
+      paymentMode: payment.paymentMode,
+      date: payment.issuedDate,
+      createdBy: req.user._id,
+    });
 
     return res.status(201).json({
       success: true,
@@ -167,12 +180,30 @@ export const patchPdfUrl = async (req, res) => {
 // ── Update Payment ────────────────────────────────────────────────────────────
 export const updateRegPayment = async (req, res) => {
   try {
+    const before = await RegPayment.findById(req.params.id);
+    if (!before) return res.status(404).json({ success: false, message: 'Payment not found' });
+    const previouslyPaid = before.advanceAmount || 0;
+
     const payment = await RegPayment.findByIdAndUpdate(
       req.params.id,
       { ...req.body },
       { new: true, runValidators: true }
     );
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
+
+    // If this update collected additional money (e.g. paying off a balance),
+    // reflect only the newly collected delta as Income → Admission.
+    const newlyPaid = (payment.advanceAmount || 0) - previouslyPaid;
+    if (newlyPaid > 0) {
+      await recordAdmissionIncome({
+        amountPaid: newlyPaid,
+        memberName: payment.memberName,
+        invoiceNo: payment.invoiceNo,
+        paymentMode: payment.paymentMode,
+        createdBy: req.user._id,
+      });
+    }
+
     return res.status(200).json({ success: true, message: 'Payment updated', payment });
   } catch (err) {
     console.error('updateRegPayment error:', err);

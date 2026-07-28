@@ -32,6 +32,7 @@ const regPaymentSchema = new mongoose.Schema(
     paymentType:   { type: String, enum: ["full", "partly"], default: "full" },
     advanceAmount: { type: Number, default: 0 },  // amount paid now
     balanceAmount: { type: Number, default: 0 },  // remaining due
+    nextDueDate:   { type: Date }, // when the remaining balance is expected to be paid (partial payments)
     transactionId: { type: String },
     writtenOff:    { type: Boolean, default: false }, // balance permanently waived
     writtenOffAt:  { type: Date },
