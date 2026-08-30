@@ -15,6 +15,10 @@ export const createRegDietPlan = async (req, res) => {
       return res.status(404).json({ success: false, message: "Member not found" });
     }
 
+    if (member.status === 'blocked') {
+      return res.status(403).json({ success: false, message: "Member is blocked and cannot receive diet plans" });
+    }
+
     // Deactivate any previous active plan for this member
     await RegDietPlan.updateMany({ registrationId, isActive: true }, { isActive: false });
 

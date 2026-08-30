@@ -27,6 +27,10 @@ export const importDietCSV = async (req, res) => {
       return res.status(404).json({ success: false, message: "Member not found" });
     }
 
+    if (member.status === 'blocked') {
+      return res.status(403).json({ success: false, message: "Member is blocked and cannot import diet plans" });
+    }
+
     // Parse CSV from buffer
     const csvText = req.file.buffer.toString("utf-8");
     const { headers, rows } = parseCSVText(csvText);

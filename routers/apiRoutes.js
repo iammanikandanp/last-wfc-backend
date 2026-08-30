@@ -108,6 +108,41 @@ import {
   getAllBlockEntries,
   deleteBlockEntry,
 } from "../controllers/blockListController.js";
+import {
+  getAllStock,
+  createStockItem,
+  updateStockItem,
+  refillStock,
+  getRefillHistory,
+  getConsumptionByDate,
+  createConsumption,
+  getCafeteriaDashboard,
+} from "../controllers/cafeteriaController.js";
+import {
+  getTransactions,
+  createTransaction,
+  getDashboard,
+  getMemberBalance,
+} from "../controllers/cafeteriaNewController.js";
+import {
+  createProgressRecord,
+  getProgressByMember,
+} from "../controllers/memberProgressController.js";
+import {
+  createWeightHistoryEntry,
+  getWeightHistoryByMember,
+  getLatestWeightHistoryByMember,
+} from "../controllers/weightHistoryController.js";
+import {
+  createHealthRecord,
+  getHealthRecordsByMember,
+  getLatestHealthRecordByMember,
+} from "../controllers/healthRecordController.js";
+
+import {
+  createSession,
+  getSessionsByMember,
+} from "../controllers/progressPhotoSessionController.js";
 
 const router = express.Router();
 
@@ -146,6 +181,15 @@ router.post("/auth/reset-password", resetPassword);
 
 // ── Public invoice viewer (shared via WhatsApp) ───────────────────────────────
 router.get("/invoice/:id", viewInvoice);
+
+router.get("/temp-delete-status", async (req, res) => {
+  try {
+    const { LeadStatus } = await import("../models/LeadStatus.js");
+    await LeadStatus.deleteOne({ name: 'never' });
+    res.send("deleted");
+  } catch(e) { res.status(500).send(e.message); }
+});
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROTECTED ROUTES  (Bearer token required on every request below)
@@ -288,5 +332,47 @@ router.delete("/incomes/:id", authorize("admin"), deleteIncome);
 router.post("/block-list",       authorize("admin", "trainer"), createBlockEntry);
 router.get("/block-list",        authorize("admin", "trainer"), getAllBlockEntries);
 router.delete("/block-list/:id", authorize("admin", "trainer"), deleteBlockEntry);
+
+// ── Cafeteria ─────────────────────────────────────────────────────────────────
+
+router.get("/cafeteria/transactions",       authorize("admin"), getTransactions);
+router.post("/cafeteria/transactions",      authorize("admin"), createTransaction);
+router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
+router.get("/cafeteria/member-balance/:id", authorize("admin"), getMemberBalance);
+// Stock management (cafeteriaController)
+router.get("/cafeteria/stock",                      authorize("admin"), getAllStock);
+router.post("/cafeteria/stock",                     authorize("admin"), createStockItem);
+router.put("/cafeteria/stock/:id",                  authorize("admin"), updateStockItem);
+router.post("/cafeteria/stock/:id/refill",          authorize("admin"), refillStock);
+router.get("/cafeteria/stock/refill-history",       authorize("admin"), getRefillHistory);
+router.get("/cafeteria/consumption",                authorize("admin"), getConsumptionByDate);
+router.post("/cafeteria/consumption",               authorize("admin"), createConsumption);
+
+// ── Member Progress ───────────────────────────────────────────────────────────
+router.post("/member-progress",             authorize("admin", "trainer"), createProgressRecord);
+router.get("/member-progress/member/:id",   getProgressByMember); // controller enforces member ownership
+
+// ── Progress Photo Sessions ───────────────────────────────────────────────────
+router.post(
+  "/progress-photo-session",
+  authorize("admin", "trainer"),
+  parser.fields([
+    { name: "frontImage", maxCount: 1 },
+    { name: "sideImage", maxCount: 1 },
+    { name: "backImage", maxCount: 1 },
+  ]),
+  createSession
+);
+router.get("/progress-photo-session/member/:id", getSessionsByMember);
+
+// ── Weight History ───────────────────────────────────────────────────────────
+router.post("/weight-history",             authorize("admin", "trainer"), createWeightHistoryEntry);
+router.get("/weight-history/member/:id",   getWeightHistoryByMember);
+router.get("/weight-history/latest/:id",   getLatestWeightHistoryByMember);
+
+// ── Health Records (Blood Pressure / Sugar) ──────────────────────────────────
+router.post("/health-records",                 authorize("admin", "trainer"), createHealthRecord);
+router.get("/health-records/member/:id",       getHealthRecordsByMember);
+router.get("/health-records/member/latest/:id", getLatestHealthRecordByMember);
 
 export default router;

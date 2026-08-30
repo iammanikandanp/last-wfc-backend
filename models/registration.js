@@ -26,6 +26,8 @@ images: {
   },
   bloodGroup: { type: String,   },
   statusLevel: { type: String,   },
+  status: { type: String, enum: ["pending","active","expiring","expired","blocked"], default: "active" },
+  goal: { type: String, default: "" },
   issues: { type: String },
   description: { type: String, default: "" },
 

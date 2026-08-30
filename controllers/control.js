@@ -1,5 +1,6 @@
 import { Registration } from "../models/registration.js";
 import { User } from "../models/User.js";
+import { WeightHistory } from "../models/WeightHistory.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 export const register = async (req, res) => {
@@ -10,7 +11,8 @@ export const register = async (req, res) => {
       packages, duration, services, startDate, endDate,
       bodyFat, waist, neck, hip,
       sugarLevel, bloodPressure, attendanceId = "",
-      personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = ""
+      personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = "",
+      goal = "",
     } = req.body;
     console.log("Register body:", req.body);
 
@@ -39,11 +41,23 @@ export const register = async (req, res) => {
       bodyFat, waist, neck, hip, sugarLevel, bloodPressure,
       attendanceId,
       personalTraining, customWorkout, customDiet, rehabTherapy,
-      statusLevel,
+      statusLevel, goal,
       images: { profileImage, frontBodyImage, sideBodyImage, backBodyImage },
     });
 
     const savedUser = await newUser.save();
+
+    if (weight !== undefined && weight !== null && weight !== "") {
+      await WeightHistory.create({
+        registrationId: savedUser._id,
+        memberName: name || "",
+        weight: Number(weight),
+        recordDate: new Date(startDate || Date.now()),
+        recordTime: new Date().toTimeString().slice(0, 5),
+        notes: "Initial weight recorded at registration",
+        recordType: "initial",
+      });
+    }
 
     // Auto-link: if a User account exists with the same phone, set their registrationId
     if (phone) {
@@ -63,9 +77,9 @@ export const register = async (req, res) => {
 // ── Fetch All ─────────────────────────────────────────────────────────────────
 export const fetch = async (req, res) => {
   try {
-    const fetchAll = await Registration.find({});
+    // Exclude blocked members from general fetch lists — blocked members are only visible via block-list
+    const fetchAll = await Registration.find({ status: { $ne: "blocked" } });
     res.status(200).json({ message: "fetch all data", data: fetchAll });
-    console.log("Fetched all registrations:", fetchAll.length);
   } catch (err) {
     console.log("fetch error:", err);
     res.status(500).json({ message: "Internal Server Error", error: err.message });
@@ -88,7 +102,8 @@ export const updatereg = async (req, res) => {
       packages, duration, services, startDate, endDate,
       bodyFat, waist, neck, hip, sugarLevel, bloodPressure,
       attendanceId = "",
-      personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = ""
+      personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = "",
+      goal,
     } = req.body;
 
     if (!name) {
@@ -119,7 +134,7 @@ export const updatereg = async (req, res) => {
       bodyFat, waist, neck, hip, sugarLevel, bloodPressure,
       attendanceId,
       personalTraining, customWorkout, customDiet, rehabTherapy,
-      statusLevel,
+      statusLevel, goal: goal !== undefined ? goal : existing.goal,
       images: { profileImage, frontBodyImage, sideBodyImage, backBodyImage },
     };
 

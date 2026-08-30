@@ -12,13 +12,18 @@ export const createRegPayment = async (req, res) => {
       finalAmount,
       paymentMode,
       paymentType,
+      isRenewal,
       advanceAmount,
       balanceAmount,
+      dueDate,
       startDate,
       endDate,
       issuedDate,
       invoiceNo,
       pdfUrl,
+      paymentStatus,
+      renewalDate,
+      duration,
     } = req.body;
 
     if (!registrationId || !pkg || !amount || !paymentMode || !invoiceNo) {
@@ -34,6 +39,10 @@ export const createRegPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Member not found" });
     }
 
+    if (member.status === 'blocked') {
+      return res.status(403).json({ success: false, message: "Member is blocked and cannot receive payments via this API" });
+    }
+
     const payment = new RegPayment({
       registrationId,
       memberName:    member.name,
@@ -45,13 +54,17 @@ export const createRegPayment = async (req, res) => {
       finalAmount:   Number(finalAmount),
       paymentMode,
       paymentType:   paymentType || 'full',
+      isRenewal: Boolean(isRenewal),
       advanceAmount: Number(advanceAmount) || Number(finalAmount),
       balanceAmount: Number(balanceAmount) || 0,
-      paymentStatus: "completed",
+      dueDate:       dueDate ? new Date(dueDate) : null,
+      paymentStatus: paymentStatus || "completed",
       invoiceNo,
       startDate:     startDate ? new Date(startDate) : new Date(),
       endDate:       endDate   ? new Date(endDate)   : null,
       issuedDate:    issuedDate ? new Date(issuedDate) : new Date(),
+      renewalDate:   renewalDate ? new Date(renewalDate) : new Date(),
+      duration:      duration ? Number(duration) : null,
       pdfUrl:        pdfUrl || "",
       transactionId: `TXN-${Date.now()}`,
     });

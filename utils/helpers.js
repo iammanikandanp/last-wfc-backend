@@ -52,6 +52,18 @@ export const isOverdue = (expiryDate) => {
   return new Date(expiryDate) < new Date();
 };
 
+// Compute membership status from start/end dates
+export const computeMembershipStatus = (startDate, endDate) => {
+  if (!startDate && !endDate) return "pending";
+  const now = new Date();
+  if (!endDate) return "active";
+  const ed = new Date(endDate);
+  const diffDays = Math.ceil((ed - now) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return "expired";
+  if (diffDays <= 7) return "expiring";
+  return "active";
+};
+
 export const parseMonthDuration = (planName) => {
   const planDurations = {
     "Guest Plan": 1,

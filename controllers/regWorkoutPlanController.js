@@ -10,6 +10,10 @@ export const createRegWorkoutPlan = async (req, res) => {
     const member = await Registration.findById(registrationId);
     if (!member) return res.status(404).json({ success: false, message: "Member not found" });
 
+    if (member.status === 'blocked') {
+      return res.status(403).json({ success: false, message: "Member is blocked and cannot receive workout plans" });
+    }
+
     // Deactivate previous active plan
     await RegWorkoutPlan.updateMany({ registrationId, isActive: true }, { isActive: false });
 

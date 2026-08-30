@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import connectDb from "./database/db.js";
 import router from "./routers/apiRoutes.js";
 import cors from "cors";
+import { initCafeteriaRevenueCron } from "./cron/cafeteriaRevenueJob.js";
+
 dotenv.config();
 
 const app = express();
@@ -31,4 +33,5 @@ const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
   connectDb();
+  initCafeteriaRevenueCron();
 });

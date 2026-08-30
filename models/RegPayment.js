@@ -24,14 +24,18 @@ const regPaymentSchema = new mongoose.Schema(
       enum: ["completed", "pending", "failed"],
       default: "completed",
     },
+    renewalDate: { type: Date },
+    duration: { type: Number },
     invoiceNo:   { type: String, unique: true },
     startDate:   { type: Date },
     endDate:     { type: Date },
     issuedDate:  { type: Date },
     pdfUrl:        { type: String, default: "" }, // Cloudinary PDF URL
     paymentType:   { type: String, enum: ["full", "partly"], default: "full" },
+    isRenewal: { type: Boolean, default: false },
     advanceAmount: { type: Number, default: 0 },  // amount paid now
     balanceAmount: { type: Number, default: 0 },  // remaining due
+    dueDate:       { type: Date }, // expected date for remaining amount
     transactionId: { type: String },
     writtenOff:    { type: Boolean, default: false }, // balance permanently waived
     writtenOffAt:  { type: Date },
