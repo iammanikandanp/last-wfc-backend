@@ -1,5 +1,6 @@
 import { CafeteriaStock } from "../models/CafeteriaStock.js";
 import { CafeteriaTransaction } from "../models/CafeteriaTransaction.js";
+import { CafeteriaPayment } from "../models/CafeteriaPayment.js";
 import { Registration } from "../models/registration.js";
 
 const isMemberActive = (member) => {
@@ -39,13 +40,14 @@ export const getTransactions = async (req, res) => {
 
 export const createTransaction = async (req, res) => {
   try {
-    const { memberId, itemId, quantity, paidAmount = 0, settlePreviousBalance } = req.body;
+    const { memberId, itemId, quantity, paidAmount = 0, settlePreviousBalance, paymentMode } = req.body;
     const qty = Number(quantity);
     let paidNum = Number(paidAmount); // Amount actually paid in cash/card right now
 
     if (!memberId || !itemId) return res.status(400).json({ success: false, message: "Member and item are required" });
     if (!qty || qty <= 0) return res.status(400).json({ success: false, message: "Quantity must be greater than 0" });
     if (Number.isNaN(paidNum) || paidNum < 0) return res.status(400).json({ success: false, message: "Paid amount must be valid" });
+    if (paidNum > 0 && !["Cash", "GPay"].includes(paymentMode)) return res.status(400).json({ success: false, message: "Valid payment mode (Cash, GPay) is required when paying an amount" });
 
     const [member, item] = await Promise.all([
       Registration.findById(memberId),
@@ -95,9 +97,19 @@ export const createTransaction = async (req, res) => {
       paidAmount: paidNum,
       totalAmount,
       paymentStatus: status,
+      paymentMode: paidNum > 0 ? paymentMode : undefined,
       transactionDate: new Date(),
       recordedBy: req.user._id,
     });
+
+    if (paidNum > 0) {
+      await CafeteriaPayment.create({
+        transactionId: transaction._id,
+        amount: paidNum,
+        mode: paymentMode,
+        date: new Date()
+      });
+    }
 
     item.quantity -= qty;
     await item.save();
@@ -265,6 +277,72 @@ export const deleteTransaction = async (req, res) => {
 
     await CafeteriaTransaction.findByIdAndDelete(req.params.id);
     return res.status(200).json({ success: true, message: "Transaction deleted successfully" });
+  } catch (err) {
+    return fmtError(res, err);
+  }
+};
+
+export const updateTransaction = async (req, res) => {
+  try {
+    const transaction = await CafeteriaTransaction.findById(req.params.id);
+    if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found" });
+
+    const { quantity, additionalPayment, paymentMode } = req.body;
+    
+    // If updating quantity
+    if (quantity !== undefined) {
+      let newQty = Number(quantity);
+      if (newQty < 0 || Number.isNaN(newQty)) {
+        return res.status(400).json({ success: false, message: "Invalid quantity" });
+      }
+
+      const stockItem = await CafeteriaStock.findById(transaction.item);
+      if (!stockItem) return res.status(404).json({ success: false, message: "Associated stock item not found" });
+
+      const qtyDifference = newQty - transaction.quantity;
+      if (qtyDifference > 0 && stockItem.quantity < qtyDifference) {
+        return res.status(400).json({ success: false, message: `Only ${stockItem.quantity} ${stockItem.unit || 'units'} available in stock` });
+      }
+
+      stockItem.quantity -= qtyDifference;
+      await stockItem.save();
+
+      transaction.quantity = newQty;
+      transaction.itemAmount = Number(stockItem.costPerUnit || 0) * newQty;
+      transaction.totalAmount = transaction.itemAmount;
+    }
+
+    // If adding payment
+    if (additionalPayment !== undefined) {
+      let addedPayment = Number(additionalPayment);
+      if (Number.isNaN(addedPayment) || addedPayment < 0) {
+         return res.status(400).json({ success: false, message: "Invalid additional payment amount" });
+      }
+      
+      if (addedPayment > 0) {
+        if (!["Cash", "GPay"].includes(paymentMode)) {
+          return res.status(400).json({ success: false, message: "Valid payment mode (Cash, GPay) is required when paying an amount" });
+        }
+        
+        transaction.paidAmount += addedPayment;
+        transaction.paymentMode = paymentMode;
+
+        await CafeteriaPayment.create({
+          transactionId: transaction._id,
+          amount: addedPayment,
+          mode: paymentMode,
+          date: new Date()
+        });
+      }
+    }
+
+    // Recalculate status and extra
+    transaction.extraAmount = Math.max(0, transaction.paidAmount - transaction.totalAmount);
+    transaction.paymentStatus = transaction.paidAmount >= transaction.totalAmount ? "Paid" : "Unpaid";
+
+    await transaction.save();
+
+    return res.status(200).json({ success: true, data: transaction });
   } catch (err) {
     return fmtError(res, err);
   }

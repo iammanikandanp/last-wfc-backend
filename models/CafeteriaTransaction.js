@@ -12,6 +12,7 @@ const cafeteriaTransactionSchema = new mongoose.Schema(
     paidAmount: { type: Number, required: true, min: 0, default: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     paymentStatus: { type: String, enum: ["Paid", "Unpaid"], required: true },
+    paymentMode: { type: String, enum: ["Cash", "GPay"] },
     transactionDate: { type: Date, default: Date.now },
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },

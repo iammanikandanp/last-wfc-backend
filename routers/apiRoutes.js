@@ -122,6 +122,7 @@ import {
 import {
   getTransactions,
   createTransaction,
+  updateTransaction,
   getDashboard,
   getMemberBalance,
   deleteTransaction,
@@ -339,6 +340,7 @@ router.delete("/block-list/:id", authorize("admin", "trainer"), deleteBlockEntry
 
 router.get("/cafeteria/transactions",       authorize("admin"), getTransactions);
 router.post("/cafeteria/transactions",      authorize("admin"), createTransaction);
+router.put("/cafeteria/transactions/:id",   authorize("admin"), updateTransaction);
 router.delete("/cafeteria/transactions/:id",authorize("admin"), deleteTransaction);
 router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
 router.get("/cafeteria/member-balance/:id", authorize("admin"), getMemberBalance);

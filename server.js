@@ -4,6 +4,7 @@ import connectDb from "./database/db.js";
 import router from "./routers/apiRoutes.js";
 import cors from "cors";
 import { initCafeteriaRevenueCron } from "./cron/cafeteriaRevenueJob.js";
+import { initCafeteriaExpenseCron } from "./cron/cafeteriaExpenseCron.js";
 
 dotenv.config();
 
@@ -34,4 +35,5 @@ app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
   connectDb();
   initCafeteriaRevenueCron();
+  initCafeteriaExpenseCron();
 });

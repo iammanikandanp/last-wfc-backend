@@ -53,8 +53,7 @@ export const createStockItem = async (req, res) => {
         stock: item._id,
         itemName: item.itemName,
         quantity: qty,
-        unitCost: cost,
-        totalCost: qty * cost,
+        totalRefillAmount: qty * cost,
         source: "initial",
         refilledBy: req.user._id,
       });
@@ -97,28 +96,29 @@ export const updateStockItem = async (req, res) => {
 // ── POST /api/v1/cafeteria/stock/:id/refill ────────────────────────────────────
 export const refillStock = async (req, res) => {
   try {
-    const { quantity, unitCost } = req.body;
+    const { quantity, totalRefillAmount } = req.body;
     const qty = Number(quantity);
+    const amount = Number(totalRefillAmount);
 
     if (!qty || qty <= 0) {
       return res.status(400).json({ success: false, message: "Refill quantity must be greater than 0" });
+    }
+    if (totalRefillAmount === undefined || amount < 0 || Number.isNaN(amount)) {
+      return res.status(400).json({ success: false, message: "Valid Total Refill Amount is required" });
     }
 
     const item = await CafeteriaStock.findById(req.params.id);
     if (!item) return res.status(404).json({ success: false, message: "Stock item not found" });
 
-    const cost = unitCost !== undefined && unitCost !== "" ? Number(unitCost) : item.costPerUnit;
-
     item.quantity += qty;
-    if (unitCost !== undefined && unitCost !== "") item.costPerUnit = cost; // keep the item's current price up to date
+    // Do NOT update costPerUnit here. It remains a fixed reference value.
     await item.save();
 
     const refill = await CafeteriaStockRefill.create({
       stock: item._id,
       itemName: item.itemName,
       quantity: qty,
-      unitCost: cost,
-      totalCost: qty * cost,
+      totalRefillAmount: amount,
       source: "refill",
       refilledBy: req.user._id,
     });
