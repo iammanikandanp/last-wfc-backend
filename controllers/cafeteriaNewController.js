@@ -40,33 +40,52 @@ export const getTransactions = async (req, res) => {
 
 export const createTransaction = async (req, res) => {
   try {
-    const { memberId, itemId, quantity, paidAmount = 0, settlePreviousBalance, paymentMode } = req.body;
-    const qty = Number(quantity);
-    let paidNum = Number(paidAmount); // Amount actually paid in cash/card right now
+    const { memberId, items = [], paidAmount = 0, settlePreviousBalance, paymentMode } = req.body;
+    let paidNum = Number(paidAmount);
 
-    if (!memberId || !itemId) return res.status(400).json({ success: false, message: "Member and item are required" });
-    if (!qty || qty <= 0) return res.status(400).json({ success: false, message: "Quantity must be greater than 0" });
+    if (!memberId || items.length === 0) return res.status(400).json({ success: false, message: "Member and items are required" });
     if (Number.isNaN(paidNum) || paidNum < 0) return res.status(400).json({ success: false, message: "Paid amount must be valid" });
     if (paidNum > 0 && !["Cash", "GPay"].includes(paymentMode)) return res.status(400).json({ success: false, message: "Valid payment mode (Cash, GPay) is required when paying an amount" });
 
-    const [member, item] = await Promise.all([
-      Registration.findById(memberId),
-      CafeteriaStock.findById(itemId),
-    ]);
-
+    const member = await Registration.findById(memberId);
     if (!member) return res.status(404).json({ success: false, message: "Member not found" });
-    if (!item) return res.status(404).json({ success: false, message: "Item not found" });
     if (!isMemberActive(member)) return res.status(400).json({ success: false, message: "Member is not active" });
-    if (qty > item.quantity) return res.status(400).json({ success: false, message: `Only ${item.quantity} ${item.unit || 'units'} of ${item.itemName} available in stock` });
 
-    const totalAmount = Number(item.costPerUnit || 0) * qty; // actual item cost
+    let globalTotalAmount = 0;
+    const processedItems = [];
+
+    // Loop through requested items and deduct stock
+    for (const reqItem of items) {
+      const qty = Number(reqItem.quantity);
+      if (!qty || qty <= 0) return res.status(400).json({ success: false, message: "Quantity must be greater than 0" });
+
+      const stockItem = await CafeteriaStock.findById(reqItem.itemId);
+      if (!stockItem) return res.status(404).json({ success: false, message: `Item ${reqItem.itemId} not found` });
+      
+      if (qty > stockItem.quantity) {
+        return res.status(400).json({ success: false, message: `Only ${stockItem.quantity} ${stockItem.unit || 'units'} of ${stockItem.itemName} available in stock` });
+      }
+
+      const itemCost = Number(stockItem.costPerUnit || 0) * qty;
+      globalTotalAmount += itemCost;
+
+      processedItems.push({
+        itemId: stockItem._id,
+        itemName: stockItem.itemName,
+        quantity: qty,
+        amount: itemCost
+      });
+
+      // Deduct stock
+      stockItem.quantity -= qty;
+      await stockItem.save();
+    }
     
     // Find past credit if settlePreviousBalance is true
     let availableCredit = 0;
     let allPastTx = [];
     if (settlePreviousBalance) {
       allPastTx = await CafeteriaTransaction.find({ member: member._id }).sort({ transactionDate: 1 });
-      // Total paid historically minus total cost historically
       let historicalPaid = 0;
       let historicalCost = 0;
       allPastTx.forEach(t => {
@@ -79,23 +98,25 @@ export const createTransaction = async (req, res) => {
     // Apply available credit to this transaction's paidAmount
     let creditUsed = 0;
     if (availableCredit > 0) {
-      creditUsed = Math.min(availableCredit, Math.max(0, totalAmount - paidNum));
+      creditUsed = Math.min(availableCredit, Math.max(0, globalTotalAmount - paidNum));
       paidNum += creditUsed;
     }
 
-    const extraAmount = Math.max(0, paidNum - totalAmount);
-    const status = paidNum >= totalAmount ? "Paid" : "Unpaid";
+    const extraAmount = Math.max(0, paidNum - globalTotalAmount);
+    const status = paidNum >= globalTotalAmount ? "Paid" : "Unpaid";
 
     const transaction = await CafeteriaTransaction.create({
       member: member._id,
       memberName: member.name || "Unknown",
-      item: item._id,
-      itemName: item.itemName,
-      quantity: qty,
-      itemAmount: totalAmount,
+      items: processedItems,
+      // Provide legacy fields as fallback (using the first item if available) just in case
+      item: processedItems.length > 0 ? processedItems[0].itemId : undefined,
+      itemName: processedItems.length > 0 ? processedItems[0].itemName : undefined,
+      quantity: processedItems.length > 0 ? processedItems[0].quantity : undefined,
+      itemAmount: processedItems.length > 0 ? processedItems[0].amount : undefined,
       extraAmount,
       paidAmount: paidNum,
-      totalAmount,
+      totalAmount: globalTotalAmount,
       paymentStatus: status,
       paymentMode: paidNum > 0 ? paymentMode : undefined,
       transactionDate: new Date(),
@@ -111,9 +132,6 @@ export const createTransaction = async (req, res) => {
       });
     }
 
-    item.quantity -= qty;
-    await item.save();
-
     // If there is excess payment and they want to settle previous unpaid transactions
     if (settlePreviousBalance && extraAmount > 0) {
       let remainingToSettle = extraAmount;
@@ -127,7 +145,6 @@ export const createTransaction = async (req, res) => {
             t.paidAmount += amountToApply;
             remainingToSettle -= amountToApply;
             
-            // Recalculate status and extra
             t.extraAmount = Math.max(0, t.paidAmount - t.totalAmount);
             if (t.paidAmount >= t.totalAmount) {
               t.paymentStatus = "Paid";
@@ -137,11 +154,6 @@ export const createTransaction = async (req, res) => {
         }
       }
       
-      // We do NOT subtract from the new transaction's paidAmount because that represents the overall pool of money received today
-      // The total netBalance will correctly resolve because the new transaction has extraAmount, which counteracts the increased paidAmount of old txs.
-      // Wait, if we increase t.paidAmount, the global sum(paidAmount) increases, which creates money out of nowhere!
-      // ACCOUNTING FIX: If we distribute the extra money from the current transaction to old ones, we MUST subtract it from the current transaction's paidAmount!
-      
       if (extraAmount - remainingToSettle > 0) {
           const amountDistributed = extraAmount - remainingToSettle;
           transaction.paidAmount -= amountDistributed;
@@ -149,7 +161,7 @@ export const createTransaction = async (req, res) => {
           if (transaction.paidAmount >= transaction.totalAmount) {
              transaction.paymentStatus = "Paid";
           } else {
-             transaction.paymentStatus = "Unpaid"; // Should never happen since we only distribute extra
+             transaction.paymentStatus = "Unpaid"; 
           }
           await transaction.save();
       }
@@ -267,7 +279,16 @@ export const deleteTransaction = async (req, res) => {
     if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found" });
 
     // Refund stock to inventory
-    if (transaction.item) {
+    if (transaction.items && transaction.items.length > 0) {
+      for (const reqItem of transaction.items) {
+        const stockItem = await CafeteriaStock.findById(reqItem.itemId);
+        if (stockItem) {
+          stockItem.quantity += (reqItem.quantity || 0);
+          await stockItem.save();
+        }
+      }
+    } else if (transaction.item) {
+      // Legacy fallback
       const stockItem = await CafeteriaStock.findById(transaction.item);
       if (stockItem) {
         stockItem.quantity += (transaction.quantity || 0);
@@ -275,8 +296,47 @@ export const deleteTransaction = async (req, res) => {
       }
     }
 
+    // Delete associated payments
+    await CafeteriaPayment.deleteMany({ transactionId: req.params.id });
+
     await CafeteriaTransaction.findByIdAndDelete(req.params.id);
     return res.status(200).json({ success: true, message: "Transaction deleted successfully" });
+  } catch (err) {
+    return fmtError(res, err);
+  }
+};
+
+export const deleteAllTransactions = async (req, res) => {
+  try {
+    const transactions = await CafeteriaTransaction.find();
+    
+    const stockRefunds = {};
+    for (const t of transactions) {
+      if (t.items && t.items.length > 0) {
+        for (const reqItem of t.items) {
+           if (reqItem.itemId) {
+              stockRefunds[reqItem.itemId] = (stockRefunds[reqItem.itemId] || 0) + (reqItem.quantity || 0);
+           }
+        }
+      } else if (t.item) {
+        stockRefunds[t.item] = (stockRefunds[t.item] || 0) + (t.quantity || 0);
+      }
+    }
+
+    const bulkOps = Object.keys(stockRefunds).map(itemId => ({
+      updateOne: {
+        filter: { _id: itemId },
+        update: { $inc: { quantity: stockRefunds[itemId] } }
+      }
+    }));
+    if (bulkOps.length > 0) {
+      await CafeteriaStock.bulkWrite(bulkOps);
+    }
+
+    await CafeteriaPayment.deleteMany({});
+    await CafeteriaTransaction.deleteMany({});
+    
+    return res.status(200).json({ success: true, message: "All transaction history deleted successfully" });
   } catch (err) {
     return fmtError(res, err);
   }
