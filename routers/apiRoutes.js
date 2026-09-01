@@ -117,12 +117,14 @@ import {
   getConsumptionByDate,
   createConsumption,
   getCafeteriaDashboard,
+  deleteStockItem,
 } from "../controllers/cafeteriaController.js";
 import {
   getTransactions,
   createTransaction,
   getDashboard,
   getMemberBalance,
+  deleteTransaction,
 } from "../controllers/cafeteriaNewController.js";
 import {
   createProgressRecord,
@@ -337,12 +339,14 @@ router.delete("/block-list/:id", authorize("admin", "trainer"), deleteBlockEntry
 
 router.get("/cafeteria/transactions",       authorize("admin"), getTransactions);
 router.post("/cafeteria/transactions",      authorize("admin"), createTransaction);
+router.delete("/cafeteria/transactions/:id",authorize("admin"), deleteTransaction);
 router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
 router.get("/cafeteria/member-balance/:id", authorize("admin"), getMemberBalance);
 // Stock management (cafeteriaController)
 router.get("/cafeteria/stock",                      authorize("admin"), getAllStock);
 router.post("/cafeteria/stock",                     authorize("admin"), createStockItem);
 router.put("/cafeteria/stock/:id",                  authorize("admin"), updateStockItem);
+router.delete("/cafeteria/stock/:id",               authorize("admin"), deleteStockItem);
 router.post("/cafeteria/stock/:id/refill",          authorize("admin"), refillStock);
 router.get("/cafeteria/stock/refill-history",       authorize("admin"), getRefillHistory);
 router.get("/cafeteria/consumption",                authorize("admin"), getConsumptionByDate);

@@ -293,3 +293,14 @@ export const getCafeteriaDashboard = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── DELETE /api/v1/cafeteria/stock/:id ─────────────────────────────────────────
+export const deleteStockItem = async (req, res) => {
+  try {
+    const item = await CafeteriaStock.findByIdAndDelete(req.params.id);
+    if (!item) return res.status(404).json({ success: false, message: "Stock item not found" });
+    return res.status(200).json({ success: true, message: "Stock item deleted successfully", data: item });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};

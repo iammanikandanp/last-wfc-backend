@@ -38,6 +38,8 @@ const regPaymentSchema = new mongoose.Schema(
     transactionId: { type: String },
     writtenOff:    { type: Boolean, default: false }, // balance permanently waived
     writtenOffAt:  { type: Date },
+    nextDueDate:   { type: Date },
+    dueDate:       { type: Date },
   },
   { timestamps: true }
 );

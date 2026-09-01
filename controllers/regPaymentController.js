@@ -24,6 +24,7 @@ export const createRegPayment = async (req, res) => {
       paymentStatus,
       renewalDate,
       duration,
+      nextDueDate,
     } = req.body;
 
     if (!registrationId || !pkg || !amount || !paymentMode || !invoiceNo) {
@@ -62,6 +63,7 @@ export const createRegPayment = async (req, res) => {
       startDate:     startDate ? new Date(startDate) : new Date(),
       endDate:       endDate   ? new Date(endDate)   : null,
       issuedDate:    issuedDate ? new Date(issuedDate) : new Date(),
+      nextDueDate:   nextDueDate ? new Date(nextDueDate) : null,
       renewalDate:   renewalDate ? new Date(renewalDate) : new Date(),
       duration:      duration ? Number(duration) : null,
       pdfUrl:        pdfUrl || "",

@@ -248,3 +248,24 @@ export const getDashboard = async (req, res) => {
     return fmtError(res, err);
   }
 };
+
+export const deleteTransaction = async (req, res) => {
+  try {
+    const transaction = await CafeteriaTransaction.findById(req.params.id);
+    if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found" });
+
+    // Refund stock to inventory
+    if (transaction.item) {
+      const stockItem = await CafeteriaStock.findById(transaction.item);
+      if (stockItem) {
+        stockItem.quantity += (transaction.quantity || 0);
+        await stockItem.save();
+      }
+    }
+
+    await CafeteriaTransaction.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ success: true, message: "Transaction deleted successfully" });
+  } catch (err) {
+    return fmtError(res, err);
+  }
+};
