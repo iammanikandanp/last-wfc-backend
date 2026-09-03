@@ -14,9 +14,9 @@ const fmtError = (res, err) => res.status(500).json({ success: false, message: e
 export const getMemberBalance = async (req, res) => {
   try {
     const { id } = req.params;
-    const transactions = await CafeteriaTransaction.find({ member: id });
+    const transactions = await CafeteriaTransaction.find({ member: id }).sort({ transactionDate: -1 });
     const balance = transactions.reduce((sum, t) => sum + (t.paidAmount || 0) - (t.totalAmount || 0), 0);
-    return res.status(200).json({ success: true, balance });
+    return res.status(200).json({ success: true, balance, transactions });
   } catch (err) {
     return fmtError(res, err);
   }
