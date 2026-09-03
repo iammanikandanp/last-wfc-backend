@@ -53,6 +53,10 @@ export const registerUser = async (req, res) => {
         role: user.role,
         canManagePayments: user.canManagePayments,
         registrationId: user.registrationId,
+        profession: user.profession,
+        experience: user.experience,
+        bio: user.bio,
+        profilePhoto: user.profilePhoto,
       },
     });
   } catch (error) {
@@ -130,6 +134,10 @@ export const loginUser = async (req, res) => {
         role: user.role,
         canManagePayments: user.canManagePayments,
         registrationId: user.registrationId,
+        profession: user.profession,
+        experience: user.experience,
+        bio: user.bio,
+        profilePhoto: user.profilePhoto,
       },
     });
   } catch (error) {
@@ -253,7 +261,7 @@ export const resetPassword = async (req, res) => {
 // Update user profile
 export const updateProfile = async (req, res) => {
   try {
-    const { name, email, phone } = req.body;
+    const { name, email, phone, profession, experience, bio } = req.body;
 
     let user = await User.findById(req.user.id);
 
@@ -264,9 +272,13 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (phone) user.phone = phone;
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    if (phone !== undefined) user.phone = phone;
+    if (profession !== undefined) user.profession = profession;
+    if (experience !== undefined) user.experience = experience;
+    if (bio !== undefined) user.bio = bio;
+    if (req.file && req.file.path) user.profilePhoto = req.file.path;
 
     await user.save();
 

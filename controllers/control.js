@@ -1,6 +1,9 @@
 import { Registration } from "../models/registration.js";
 import { User } from "../models/User.js";
 import { WeightHistory } from "../models/WeightHistory.js";
+import { MemberProgress } from "../models/MemberProgress.js";
+import { HealthRecord } from "../models/HealthRecord.js";
+import { ProgressPhotoSession } from "../models/ProgressPhotoSession.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 export const register = async (req, res) => {
@@ -57,6 +60,59 @@ export const register = async (req, res) => {
         notes: "Initial weight recorded at registration",
         recordType: "initial",
       });
+    }
+
+    // Auto-create initial MemberProgress record
+    if (height || weight || bodyFat || bmi || waist || neck || hip) {
+      await MemberProgress.create({
+        registration: savedUser._id,
+        date: new Date(startDate || Date.now()),
+        weight: weight ? Number(weight) : undefined,
+        height: height ? Number(height) : undefined,
+        waist: waist ? Number(waist) : undefined,
+        hip: hip ? Number(hip) : undefined,
+        neck: neck ? Number(neck) : undefined,
+        bodyFat: bodyFat ? Number(bodyFat) : undefined,
+        bmi: bmi ? Number(bmi) : undefined,
+        notes: "Initial measurements at registration",
+      });
+    }
+
+    // Auto-create initial HealthRecord
+    if (bloodPressure || sugarLevel) {
+      // Parse BP if possible, though schema stores it as string as well.
+      let sys, dia;
+      if (bloodPressure && typeof bloodPressure === 'string' && bloodPressure.includes('/')) {
+        const parts = bloodPressure.split('/');
+        sys = Number(parts[0]);
+        dia = Number(parts[1]);
+      }
+      
+      await HealthRecord.create({
+        registration: savedUser._id,
+        bloodPressure: bloodPressure || "",
+        systolic: sys,
+        diastolic: dia,
+        sugarLevel: sugarLevel ? Number(sugarLevel) : undefined,
+        date: new Date(startDate || Date.now()),
+        time: new Date().toTimeString().slice(0, 5),
+      });
+    }
+
+    // Auto-create initial ProgressPhotoSession
+    if (profileImage || frontBodyImage || sideBodyImage || backBodyImage) {
+      // We only care about progress photos (front/side/back) for progress sessions,
+      // but if they uploaded them, create the session.
+      if (frontBodyImage || sideBodyImage || backBodyImage) {
+        await ProgressPhotoSession.create({
+          registration: savedUser._id,
+          date: new Date(startDate || Date.now()),
+          frontImage: frontBodyImage || "",
+          sideImage: sideBodyImage || "",
+          backImage: backBodyImage || "",
+          notes: "Initial photos at registration",
+        });
+      }
     }
 
     // Auto-link: if a User account exists with the same phone, set their registrationId

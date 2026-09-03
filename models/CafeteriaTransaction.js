@@ -2,8 +2,9 @@ import mongoose from "mongoose";
 
 const cafeteriaTransactionSchema = new mongoose.Schema(
   {
-    member: { type: mongoose.Schema.Types.ObjectId, ref: "Registra", required: true },
-    memberName: { type: String, required: true, trim: true },
+    transactionType: { type: String, enum: ["member", "admin"], default: "member" },
+    member: { type: mongoose.Schema.Types.ObjectId, ref: "Registra" },
+    memberName: { type: String, trim: true },
     // Legacy fields (kept for backward compatibility, now optional)
     item: { type: mongoose.Schema.Types.ObjectId, ref: "CafeteriaStock" },
     itemName: { type: String, trim: true },
@@ -19,10 +20,10 @@ const cafeteriaTransactionSchema = new mongoose.Schema(
         amount: { type: Number, required: true, min: 0 },
       }
     ],
-    extraAmount: { type: Number, required: true, min: 0, default: 0 },
-    paidAmount: { type: Number, required: true, min: 0, default: 0 },
-    totalAmount: { type: Number, required: true, min: 0 },
-    paymentStatus: { type: String, enum: ["Paid", "Unpaid"], required: true },
+    extraAmount: { type: Number, min: 0, default: 0 },
+    paidAmount: { type: Number, min: 0, default: 0 },
+    totalAmount: { type: Number, min: 0 },
+    paymentStatus: { type: String, enum: ["Paid", "Unpaid", "Admin"] },
     paymentMode: { type: String, enum: ["Cash", "GPay"] },
     transactionDate: { type: Date, default: Date.now },
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

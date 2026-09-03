@@ -25,9 +25,16 @@ export const getTransactions = async (req, res) => {
   try {
     const status = req.query.status;
     const filter = {};
-    if (status === "Paid") filter.paymentStatus = "Paid";
-    if (status === "Unpaid") filter.paymentStatus = "Unpaid";
-    if (status === "Extra") filter.extraAmount = { $gt: 0 };
+    if (status) {
+      if (status === "Admin") {
+        filter.transactionType = "admin";
+      } else {
+        filter.transactionType = { $ne: "admin" };
+        if (status === "Paid") filter.paymentStatus = "Paid";
+        if (status === "Unpaid") filter.paymentStatus = "Unpaid";
+        if (status === "Extra") filter.extraAmount = { $gt: 0 };
+      }
+    }
     const records = await CafeteriaTransaction.find(filter)
       .populate("member", "name phone")
       .populate("item", "itemName price")
@@ -40,7 +47,55 @@ export const getTransactions = async (req, res) => {
 
 export const createTransaction = async (req, res) => {
   try {
-    const { memberId, items = [], paidAmount = 0, settlePreviousBalance, paymentMode } = req.body;
+    const { memberId, items = [], paidAmount = 0, settlePreviousBalance, paymentMode, transactionType = "member" } = req.body;
+
+    if (transactionType === "admin") {
+      if (items.length === 0) return res.status(400).json({ success: false, message: "Items are required" });
+
+      const processedItems = [];
+      for (const reqItem of items) {
+        const qty = Number(reqItem.quantity);
+        if (!qty || qty <= 0) return res.status(400).json({ success: false, message: "Quantity must be greater than 0" });
+
+        const stockItem = await CafeteriaStock.findById(reqItem.itemId);
+        if (!stockItem) return res.status(404).json({ success: false, message: `Item not found` });
+        
+        if (qty > stockItem.quantity) {
+          return res.status(400).json({ success: false, message: `Only ${stockItem.quantity} ${stockItem.unit || 'units'} of ${stockItem.itemName} available in stock` });
+        }
+
+        const itemCost = Number(stockItem.costPerUnit || 0) * qty;
+
+        processedItems.push({
+          itemId: stockItem._id,
+          itemName: stockItem.itemName,
+          quantity: qty,
+          amount: itemCost
+        });
+
+        // Deduct stock
+        stockItem.quantity -= qty;
+        await stockItem.save();
+      }
+
+      const transaction = await CafeteriaTransaction.create({
+        transactionType: "admin",
+        items: processedItems,
+        item: processedItems.length > 0 ? processedItems[0].itemId : undefined,
+        itemName: processedItems.length > 0 ? processedItems[0].itemName : undefined,
+        quantity: processedItems.length > 0 ? processedItems[0].quantity : undefined,
+        itemAmount: processedItems.length > 0 ? processedItems[0].amount : undefined,
+        totalAmount: 0,
+        paidAmount: 0,
+        extraAmount: 0,
+        paymentStatus: "Admin",
+        transactionDate: new Date(),
+        recordedBy: req.user._id,
+      });
+
+      return res.status(201).json({ success: true, transaction });
+    }
+
     let paidNum = Number(paidAmount);
 
     if (!memberId || items.length === 0) return res.status(400).json({ success: false, message: "Member and items are required" });

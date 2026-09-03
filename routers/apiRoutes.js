@@ -202,7 +202,7 @@ router.use(protect);   // ← all routes defined after this line require a valid
 
 // ── Auth (current user) ───────────────────────────────────────────────────────
 router.get("/auth/me",              getCurrentUser);
-router.put("/auth/profile",         updateProfile);
+router.put("/auth/profile",         parser.single("profilePhoto"), updateProfile);
 router.get("/auth/users",           authorize("admin"), getAllUsers);
 
 // ── Registration ──────────────────────────────────────────────────────────────

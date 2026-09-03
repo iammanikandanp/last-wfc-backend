@@ -49,6 +49,22 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    profession: {
+      type: String,
+      default: "Admin",
+    },
+    experience: {
+      type: String,
+      default: "",
+    },
+    bio: {
+      type: String,
+      default: "",
+    },
+    profilePhoto: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );
