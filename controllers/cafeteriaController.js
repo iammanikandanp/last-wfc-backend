@@ -5,10 +5,10 @@ import { Registration } from "../models/registration.js";
 
 // A member counts as "active" the same way the Members page does:
 // not expired, and not within 7 days of expiry.
-const isMemberActive = (endDate) => {
-  if (!endDate) return false;
-  const diffDays = Math.ceil((new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24));
-  return diffDays > 7;
+const isMemberActive = (member) => {
+  if (!member?.endDate) return false;
+  const diffDays = Math.ceil((new Date(member.endDate) - new Date()) / (1000 * 60 * 60 * 24));
+  return member.status !== "blocked" && diffDays > 0;
 };
 
 // ── GET /api/v1/cafeteria/stock ────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export const createConsumption = async (req, res) => {
 
     if (!item) return res.status(404).json({ success: false, message: "Stock item not found" });
     if (!member) return res.status(404).json({ success: false, message: "Member not found" });
-    if (!isMemberActive(member.endDate)) {
+    if (!isMemberActive(member)) {
       return res.status(400).json({ success: false, message: "Selected member is not an active member" });
     }
 

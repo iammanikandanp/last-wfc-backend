@@ -6,7 +6,7 @@ import { Registration } from "../models/registration.js";
 const isMemberActive = (member) => {
   if (!member?.endDate) return false;
   const diffDays = Math.ceil((new Date(member.endDate) - new Date()) / (1000 * 60 * 60 * 24));
-  return diffDays > 7;
+  return member.status !== "blocked" && diffDays > 0;
 };
 
 const fmtError = (res, err) => res.status(500).json({ success: false, message: err.message || "Server error" });
@@ -47,7 +47,7 @@ export const getTransactions = async (req, res) => {
 
 export const createTransaction = async (req, res) => {
   try {
-    const { memberId, items = [], paidAmount = 0, settlePreviousBalance, paymentMode, transactionType = "member" } = req.body;
+    const { memberId, items = [], paidAmount = 0, paymentMode, transactionType = "member" } = req.body;
 
     if (transactionType === "admin") {
       if (items.length === 0) return res.status(400).json({ success: false, message: "Items are required" });
@@ -136,29 +136,11 @@ export const createTransaction = async (req, res) => {
       await stockItem.save();
     }
     
-    // Find past credit if settlePreviousBalance is true
-    let availableCredit = 0;
-    let allPastTx = [];
-    if (settlePreviousBalance) {
-      allPastTx = await CafeteriaTransaction.find({ member: member._id }).sort({ transactionDate: 1 });
-      let historicalPaid = 0;
-      let historicalCost = 0;
-      allPastTx.forEach(t => {
-        historicalPaid += (t.paidAmount || 0);
-        historicalCost += (t.totalAmount || 0);
-      });
-      availableCredit = Math.max(0, historicalPaid - historicalCost);
-    }
-
-    // Apply available credit to this transaction's paidAmount
-    let creditUsed = 0;
-    if (availableCredit > 0) {
-      creditUsed = Math.min(availableCredit, Math.max(0, globalTotalAmount - paidNum));
-      paidNum += creditUsed;
-    }
-
-    const extraAmount = Math.max(0, paidNum - globalTotalAmount);
-    const status = paidNum >= globalTotalAmount ? "Paid" : "Unpaid";
+    const previousBalance = (await CafeteriaTransaction.find({ member: member._id }))
+      .reduce((sum, transaction) => sum + (transaction.paidAmount || 0) - (transaction.totalAmount || 0), 0);
+    const resultingBalance = previousBalance + paidNum - globalTotalAmount;
+    const extraAmount = Math.max(0, resultingBalance);
+    const status = resultingBalance < 0 ? "Unpaid" : "Paid";
 
     const transaction = await CafeteriaTransaction.create({
       member: member._id,
@@ -170,6 +152,7 @@ export const createTransaction = async (req, res) => {
       quantity: processedItems.length > 0 ? processedItems[0].quantity : undefined,
       itemAmount: processedItems.length > 0 ? processedItems[0].amount : undefined,
       extraAmount,
+      resultingBalance,
       paidAmount: paidNum,
       totalAmount: globalTotalAmount,
       paymentStatus: status,
@@ -185,41 +168,6 @@ export const createTransaction = async (req, res) => {
         mode: paymentMode,
         date: new Date()
       });
-    }
-
-    // If there is excess payment and they want to settle previous unpaid transactions
-    if (settlePreviousBalance && extraAmount > 0) {
-      let remainingToSettle = extraAmount;
-      
-      for (const t of allPastTx) {
-        if (remainingToSettle <= 0) break;
-        if (t.paymentStatus === "Unpaid" && t._id.toString() !== transaction._id.toString()) {
-          const balanceDue = Math.max(0, t.totalAmount - t.paidAmount);
-          if (balanceDue > 0) {
-            const amountToApply = Math.min(balanceDue, remainingToSettle);
-            t.paidAmount += amountToApply;
-            remainingToSettle -= amountToApply;
-            
-            t.extraAmount = Math.max(0, t.paidAmount - t.totalAmount);
-            if (t.paidAmount >= t.totalAmount) {
-              t.paymentStatus = "Paid";
-            }
-            await t.save();
-          }
-        }
-      }
-      
-      if (extraAmount - remainingToSettle > 0) {
-          const amountDistributed = extraAmount - remainingToSettle;
-          transaction.paidAmount -= amountDistributed;
-          transaction.extraAmount = Math.max(0, transaction.paidAmount - transaction.totalAmount);
-          if (transaction.paidAmount >= transaction.totalAmount) {
-             transaction.paymentStatus = "Paid";
-          } else {
-             transaction.paymentStatus = "Unpaid"; 
-          }
-          await transaction.save();
-      }
     }
 
     return res.status(201).json({ success: true, data: transaction });
