@@ -156,7 +156,7 @@ export const createTransaction = async (req, res) => {
       paidAmount: paidNum,
       totalAmount: globalTotalAmount,
       paymentStatus: status,
-      paymentMode: paidNum > 0 ? paymentMode : undefined,
+      paymentMode: paymentMode || "GPay",
       transactionDate: new Date(),
       recordedBy: req.user._id,
     });
