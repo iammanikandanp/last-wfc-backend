@@ -21,6 +21,8 @@ const cafeteriaTransactionSchema = new mongoose.Schema(
       }
     ],
     extraAmount: { type: Number, min: 0, default: 0 },
+    previousBalanceUsed: { type: Number, default: 0 },
+    newPaymentAmount: { type: Number, default: 0 },
     resultingBalance: { type: Number, default: 0 },
     paidAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, min: 0 },

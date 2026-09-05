@@ -15,7 +15,7 @@ export const getMemberBalance = async (req, res) => {
   try {
     const { id } = req.params;
     const transactions = await CafeteriaTransaction.find({ member: id }).sort({ transactionDate: -1 });
-    const balance = transactions.reduce((sum, t) => sum + (t.paidAmount || 0) - (t.totalAmount || 0), 0);
+    const balance = transactions.reduce((sum, t) => sum + (t.paidAmount || 0) - (t.previousBalanceUsed || 0) - (t.totalAmount || 0), 0);
     return res.status(200).json({ success: true, balance, transactions });
   } catch (err) {
     return fmtError(res, err);
@@ -36,7 +36,7 @@ export const getTransactions = async (req, res) => {
       }
     }
     const records = await CafeteriaTransaction.find(filter)
-      .populate("member", "name phone")
+      .populate("member", "name phone images.profileImage")
       .populate("item", "itemName price")
       .sort({ transactionDate: -1 });
     return res.status(200).json({ success: true, data: records });
@@ -137,10 +137,20 @@ export const createTransaction = async (req, res) => {
     }
     
     const previousBalance = (await CafeteriaTransaction.find({ member: member._id }))
-      .reduce((sum, transaction) => sum + (transaction.paidAmount || 0) - (transaction.totalAmount || 0), 0);
+      .reduce((sum, t) => sum + (t.paidAmount || 0) - (t.previousBalanceUsed || 0) - (t.totalAmount || 0), 0);
+      
+    const positiveBalance = Math.max(0, previousBalance);
+    let balanceConsumed = 0;
+    if (globalTotalAmount > paidNum) {
+      balanceConsumed = Math.min(positiveBalance, globalTotalAmount - paidNum);
+    }
+    
+    let totalPaidForThisTx = balanceConsumed + paidNum;
+    let remainingForThisTx = Math.max(0, globalTotalAmount - totalPaidForThisTx);
+    let status = remainingForThisTx === 0 ? "Paid" : "Unpaid";
+    let extraAmount = Math.max(0, totalPaidForThisTx - globalTotalAmount);
+
     const resultingBalance = previousBalance + paidNum - globalTotalAmount;
-    const extraAmount = Math.max(0, resultingBalance);
-    const status = resultingBalance < 0 ? "Unpaid" : "Paid";
 
     const transaction = await CafeteriaTransaction.create({
       member: member._id,
@@ -152,8 +162,10 @@ export const createTransaction = async (req, res) => {
       quantity: processedItems.length > 0 ? processedItems[0].quantity : undefined,
       itemAmount: processedItems.length > 0 ? processedItems[0].amount : undefined,
       extraAmount,
+      previousBalanceUsed: balanceConsumed,
+      newPaymentAmount: paidNum,
       resultingBalance,
-      paidAmount: paidNum,
+      paidAmount: totalPaidForThisTx,
       totalAmount: globalTotalAmount,
       paymentStatus: status,
       paymentMode: paymentMode || "GPay",
@@ -199,6 +211,7 @@ export const payCafeteriaBalance = async (req, res) => {
       if (balanceDue > 0) {
         const applyAmount = Math.min(balanceDue, paymentAmount);
         t.paidAmount += applyAmount;
+        t.newPaymentAmount = (t.newPaymentAmount || 0) + applyAmount;
         paymentAmount -= applyAmount;
         
         t.extraAmount = Math.max(0, t.paidAmount - t.totalAmount);
@@ -214,6 +227,7 @@ export const payCafeteriaBalance = async (req, res) => {
       const mostRecentTx = await CafeteriaTransaction.findOne({ member: memberId }).sort({ transactionDate: -1 });
       if (mostRecentTx) {
         mostRecentTx.paidAmount += paymentAmount;
+        mostRecentTx.newPaymentAmount = (mostRecentTx.newPaymentAmount || 0) + paymentAmount;
         mostRecentTx.extraAmount = Math.max(0, mostRecentTx.paidAmount - mostRecentTx.totalAmount);
         mostRecentTx.paymentStatus = "Paid";
         await mostRecentTx.save();
@@ -239,7 +253,7 @@ export const getDashboard = async (req, res) => {
       paidCount: transactions.filter(t => t.paymentStatus === "Paid").length,
       unpaidCount: transactions.filter(t => t.paymentStatus === "Unpaid").length,
       totalAmount: transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0),
-      totalCollected: transactions.reduce((sum, t) => sum + (t.paidAmount || 0), 0),
+      totalCollected: transactions.reduce((sum, t) => sum + (t.paidAmount || 0) - (t.previousBalanceUsed || 0), 0),
       totalPending: transactions.reduce((sum, t) => sum + Math.max(0, (t.totalAmount || 0) - (t.paidAmount || 0)), 0),
       totalExtraAmount: transactions.reduce((sum, t) => sum + (t.extraAmount || 0), 0),
       paidVsUnpaid: [
@@ -388,6 +402,7 @@ export const updateTransaction = async (req, res) => {
         }
         
         transaction.paidAmount += addedPayment;
+        transaction.newPaymentAmount = (transaction.newPaymentAmount || 0) + addedPayment;
         transaction.paymentMode = paymentMode;
 
         await CafeteriaPayment.create({
