@@ -53,6 +53,20 @@ export const createLeadStatus = async (req, res) => {
   } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 };
 
+export const deleteLeadStatus = async (req, res) => {
+  try {
+    const name = req.params.name;
+    if (!name) return res.status(400).json({ success: false, message: "Status name is required" });
+    const status = await LeadStatus.findOneAndDelete({ name });
+    if (!status) return res.status(404).json({ success: false, message: "Status not found" });
+    
+    // Move any leads in this category back to "New"
+    await Lead.updateMany({ status: name }, { status: 'New' });
+    
+    return res.status(200).json({ success: true, message: "Status deleted" });
+  } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
+};
+
 export const getLeadStats = async (req, res) => {
   try {
     const all = await Lead.find();

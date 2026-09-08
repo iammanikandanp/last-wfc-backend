@@ -51,6 +51,7 @@ import {
   getLeadStats,
   getLeadStatuses,
   createLeadStatus,
+  deleteLeadStatus,
 } from "../controllers/leadController.js";
 import {
   importDietCSV,
@@ -295,6 +296,7 @@ router.post("/leads",       authorize("admin", "trainer"), parser.single("profil
 router.get("/leads/stats",  authorize("admin", "trainer"), getLeadStats);
 router.get("/leads/statuses",  authorize("admin", "trainer"), getLeadStatuses);
 router.post("/leads/statuses", authorize("admin", "trainer"), createLeadStatus);
+router.delete("/leads/statuses/:name", authorize("admin", "trainer"), deleteLeadStatus);
 router.get("/leads",        authorize("admin", "trainer"), getAllLeads);
 router.put("/leads/:id",    authorize("admin", "trainer"), parser.single("profileImage"), updateLead);
 router.delete("/leads/:id", authorize("admin"),            deleteLead);
