@@ -2,7 +2,7 @@ import { Payment } from "../models/Payment.js";
 import { Invoice } from "../models/Invoice.js";
 import { Member } from "../models/Member.js";
 import { Plan } from "../models/Plan.js";
-import { generateInvoiceNumber } from "../utils/helpers.js";
+import { getNextInvoiceNumber } from "../utils/helpers.js";
 
 // Create payment
 export const createPayment = async (req, res) => {
@@ -33,7 +33,7 @@ export const createPayment = async (req, res) => {
     endDate.setDate(endDate.getDate() + durationInDays);
 
     // Generate invoice number
-    const invoiceNumber = generateInvoiceNumber();
+    const invoiceNumber = await getNextInvoiceNumber();
 
     const payment = new Payment({
       memberId,

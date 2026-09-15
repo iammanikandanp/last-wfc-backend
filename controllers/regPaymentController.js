@@ -1,6 +1,7 @@
 import { RegPayment } from "../models/RegPayment.js";
 import { Registration } from "../models/registration.js";
 import { recordAdmissionIncome } from "../utils/recordAdmissionIncome.js";
+import { getNextInvoiceNumber } from "../utils/helpers.js";
 
 // ── Create Payment ────────────────────────────────────────────────────────────
 export const createRegPayment = async (req, res) => {
@@ -19,7 +20,6 @@ export const createRegPayment = async (req, res) => {
       startDate,
       endDate,
       issuedDate,
-      invoiceNo,
       pdfUrl,
       paymentStatus,
       renewalDate,
@@ -27,12 +27,14 @@ export const createRegPayment = async (req, res) => {
       nextDueDate,
     } = req.body;
 
-    if (!registrationId || !pkg || !amount || !paymentMode || !invoiceNo) {
+    if (!registrationId || !pkg || !amount || !paymentMode) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: registrationId, package, amount, paymentMode, invoiceNo",
+        message: "Missing required fields: registrationId, package, amount, paymentMode",
       });
     }
+
+    const invoiceNo = await getNextInvoiceNumber();
 
     // Fetch member details from Registration
     const member = await Registration.findById(registrationId);

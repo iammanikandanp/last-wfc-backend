@@ -1,4 +1,8 @@
 import jwt from "jsonwebtoken";
+import { Counter } from "../models/Counter.js";
+import { RegPayment } from "../models/RegPayment.js";
+import { Invoice } from "../models/Invoice.js";
+import { Payment } from "../models/Payment.js";
 
 export const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || "your-secret-key", {
@@ -26,9 +30,42 @@ export const calculateWaistHipRatio = (waist, hip) => {
   return parseFloat((waist / hip).toFixed(2));
 };
 
-// Generate invoice number
-export const generateInvoiceNumber = () => {
-  return `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+let isCounterInitialized = false;
+
+// Generate sequential invoice number
+export const getNextInvoiceNumber = async () => {
+  if (!isCounterInitialized) {
+    const counterDoc = await Counter.findOne({ id: "invoiceNo" });
+    if (!counterDoc) {
+      const regPayments = await RegPayment.find({}, 'invoiceNo').lean();
+      const invoices = await Invoice.find({}, 'invoiceNumber').lean();
+      const payments = await Payment.find({}, 'invoiceNumber').lean();
+      
+      let max = 0;
+      const checkMax = (str) => {
+        if (!str) return;
+        if (/^\d+$/.test(String(str))) {
+           const num = parseInt(str, 10);
+           if (num > max) max = num;
+        }
+      };
+      
+      regPayments.forEach(p => checkMax(p.invoiceNo));
+      invoices.forEach(i => checkMax(i.invoiceNumber));
+      payments.forEach(p => checkMax(p.invoiceNumber));
+      
+      await Counter.create({ id: "invoiceNo", seq: max });
+    }
+    isCounterInitialized = true;
+  }
+  
+  const updated = await Counter.findOneAndUpdate(
+    { id: "invoiceNo" },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  
+  return `WFC-INV-${String(updated.seq).padStart(4, '0')}`;
 };
 
 // Format date
