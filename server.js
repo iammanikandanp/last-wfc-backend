@@ -30,43 +30,64 @@ app.get("/health", (req, res) => {
 
 app.use("/api/v1", router);
 
-app.get('/api/migrate-production', async (req, res) => {
+app.get('/api/migrate-progress', async (req, res) => {
   try {
-    const { RegPayment } = await import('./models/RegPayment.js');
-    const { Counter } = await import('./models/Counter.js');
-    const aug1 = new Date('2026-08-01T00:00:00.000Z');
+    const { Registration } = await import('./models/registration.js');
+    const { MemberProgress } = await import('./models/MemberProgress.js');
+    const { ProgressPhotoSession } = await import('./models/ProgressPhotoSession.js');
     
-    const payments = await RegPayment.find({ createdAt: { $gte: aug1 } }).sort({ createdAt: 1 });
+    const members = await Registration.find({});
     
-    if (payments.length === 0) {
-      return res.json({ message: 'No records to migrate on production' });
+    let progressMigrated = 0;
+    let photoMigrated = 0;
+
+    for (const member of members) {
+      // Migrate measurements
+      if (member.height || member.weight || member.bmi || member.bodyFat) {
+        const existingProgress = await MemberProgress.findOne({ registration: member._id });
+        if (!existingProgress) {
+          // ensure numbers for schema
+          const toNum = v => {
+             if (v === undefined || v === null || v === "") return undefined;
+             const n = Number(v);
+             return isNaN(n) ? undefined : n;
+          };
+          await MemberProgress.create({
+            registration: member._id,
+            date: member.startDate || member.createdAt || new Date(),
+            weight: toNum(member.weight),
+            height: toNum(member.height),
+            waist: toNum(member.waist),
+            hip: toNum(member.hip),
+            neck: toNum(member.neck),
+            bodyFat: toNum(member.bodyFat),
+            bmi: toNum(member.bmi),
+            notes: "Legacy migrated data",
+          });
+          progressMigrated++;
+        }
+      }
+
+      // Migrate photos
+      if (member.images && (member.images.frontBodyImage || member.images.sideBodyImage || member.images.backBodyImage)) {
+        const existingSession = await ProgressPhotoSession.findOne({ registration: member._id });
+        if (!existingSession) {
+          await ProgressPhotoSession.create({
+            registration: member._id,
+            date: member.startDate || member.createdAt || new Date(),
+            frontImage: member.images.frontBodyImage || "",
+            sideImage: member.images.sideBodyImage || "",
+            backImage: member.images.backBodyImage || "",
+            notes: "Legacy migrated photos",
+          });
+          photoMigrated++;
+        }
+      }
     }
 
-    // Pass 1: Rename to temporary unique strings to avoid index collisions
-    for (const payment of payments) {
-      await RegPayment.updateOne({ _id: payment._id }, { $set: { invoiceNo: `TEMP-${payment._id}` } });
-    }
-
-    // Pass 2: Apply sequential formatted numbers
-    let seqNum = 1;
-    let updatedCount = 0;
-    for (const payment of payments) {
-      const formatted = `WFC-INV-${String(seqNum).padStart(4, '0')}`;
-      await RegPayment.updateOne({ _id: payment._id }, { $set: { invoiceNo: formatted } });
-      updatedCount++;
-      seqNum++;
-    }
-
-    const finalSeq = seqNum - 1;
-    await Counter.findOneAndUpdate(
-      { id: 'invoiceNo' },
-      { $set: { seq: finalSeq } },
-      { upsert: true }
-    );
-    
-    res.json({ success: true, updatedCount, totalRecords: payments.length, finalSeq });
+    res.json({ success: true, progressMigrated, photoMigrated, totalMembers: members.length });
   } catch (e) {
-    res.json({ error: e.message });
+    res.json({ error: e.message, stack: e.stack });
   }
 });
 
