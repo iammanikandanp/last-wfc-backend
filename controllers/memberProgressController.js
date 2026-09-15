@@ -11,6 +11,15 @@ export const createProgressRecord = async (req, res) => {
 
     const toNum = v => (v === undefined || v === null || v === "" ? undefined : Number(v));
 
+    // Idempotency check: prevent duplicate submissions within 5 seconds
+    const recent = await MemberProgress.findOne({
+      registration: registrationId,
+      createdAt: { $gte: new Date(Date.now() - 5000) }
+    });
+    if (recent && recent.weight == toNum(weight) && recent.bmi == toNum(bmi)) {
+      return res.status(200).json({ success: true, data: recent, message: "Duplicate prevented" });
+    }
+
     const record = await MemberProgress.create({
       registration: registrationId,
       date: date ? new Date(date) : new Date(),
@@ -40,6 +49,21 @@ export const getProgressByMember = async (req, res) => {
     const records = await MemberProgress.find({ registration: req.params.id }).sort({ date: 1 });
 
     return res.status(200).json({ success: true, data: records });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── DELETE /api/v1/member-progress/:id ──────────────────────────────────────
+export const deleteProgressRecord = async (req, res) => {
+  try {
+    const record = await MemberProgress.findById(req.params.id);
+    if (!record) return res.status(404).json({ success: false, message: "Record not found" });
+    if (record.isInitial) {
+      return res.status(403).json({ success: false, message: "Cannot delete the initial admission record." });
+    }
+    const deleted = await MemberProgress.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ success: true, data: deleted });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

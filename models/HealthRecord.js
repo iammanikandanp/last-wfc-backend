@@ -9,6 +9,7 @@ const healthRecordSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   time: { type: String, default: '' },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  isInitial: { type: Boolean, default: false },
 }, { timestamps: true });
 
 healthRecordSchema.index({ registration: 1, date: 1 });

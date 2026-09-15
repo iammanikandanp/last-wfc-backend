@@ -59,6 +59,7 @@ export const register = async (req, res) => {
         recordTime: new Date().toTimeString().slice(0, 5),
         notes: "Initial weight recorded at registration",
         recordType: "initial",
+        isInitial: true,
       });
     }
 
@@ -75,6 +76,7 @@ export const register = async (req, res) => {
         bodyFat: bodyFat ? Number(bodyFat) : undefined,
         bmi: bmi ? Number(bmi) : undefined,
         notes: "Initial measurements at registration",
+        isInitial: true,
       });
     }
 
@@ -96,6 +98,7 @@ export const register = async (req, res) => {
         sugarLevel: sugarLevel ? Number(sugarLevel) : undefined,
         date: new Date(startDate || Date.now()),
         time: new Date().toTimeString().slice(0, 5),
+        isInitial: true,
       });
     }
 
@@ -111,6 +114,7 @@ export const register = async (req, res) => {
           sideImage: sideBodyImage || "",
           backImage: backBodyImage || "",
           notes: "Initial photos at registration",
+          isInitial: true,
         });
       }
     }

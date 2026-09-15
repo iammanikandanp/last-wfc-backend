@@ -132,21 +132,25 @@ import {
 import {
   createProgressRecord,
   getProgressByMember,
+  deleteProgressRecord,
 } from "../controllers/memberProgressController.js";
 import {
   createWeightHistoryEntry,
   getWeightHistoryByMember,
   getLatestWeightHistoryByMember,
+  deleteWeightHistoryEntry,
 } from "../controllers/weightHistoryController.js";
 import {
   createHealthRecord,
   getHealthRecordsByMember,
   getLatestHealthRecordByMember,
+  deleteHealthRecord,
 } from "../controllers/healthRecordController.js";
 
 import {
   createSession,
   getSessionsByMember,
+  deleteSession,
 } from "../controllers/progressPhotoSessionController.js";
 
 const router = express.Router();
@@ -361,6 +365,7 @@ router.post("/cafeteria/consumption",               authorize("admin"), createCo
 // ── Member Progress ───────────────────────────────────────────────────────────
 router.post("/member-progress",             authorize("admin", "trainer"), createProgressRecord);
 router.get("/member-progress/member/:id",   getProgressByMember); // controller enforces member ownership
+router.delete("/member-progress/:id",       authorize("admin", "trainer"), deleteProgressRecord);
 
 // ── Progress Photo Sessions ───────────────────────────────────────────────────
 router.post(
@@ -374,15 +379,18 @@ router.post(
   createSession
 );
 router.get("/progress-photo-session/member/:id", getSessionsByMember);
+router.delete("/progress-photo-session/:id", authorize("admin", "trainer"), deleteSession);
 
 // ── Weight History ───────────────────────────────────────────────────────────
 router.post("/weight-history",             authorize("admin", "trainer"), createWeightHistoryEntry);
 router.get("/weight-history/member/:id",   getWeightHistoryByMember);
 router.get("/weight-history/latest/:id",   getLatestWeightHistoryByMember);
+router.delete("/weight-history/:id",       authorize("admin", "trainer"), deleteWeightHistoryEntry);
 
 // ── Health Records (Blood Pressure / Sugar) ──────────────────────────────────
 router.post("/health-records",                 authorize("admin", "trainer"), createHealthRecord);
 router.get("/health-records/member/:id",       getHealthRecordsByMember);
 router.get("/health-records/member/latest/:id", getLatestHealthRecordByMember);
+router.delete("/health-records/:id",           authorize("admin", "trainer"), deleteHealthRecord);
 
 export default router;

@@ -9,6 +9,7 @@ const progressPhotoSessionSchema = new mongoose.Schema(
     backImage: { type: String, default: "" },
     notes: { type: String, default: "" },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    isInitial: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

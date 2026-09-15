@@ -14,6 +14,15 @@ export const createHealthRecord = async (req, res) => {
       if (m) { systolic = Number(m[1]); diastolic = m[2] ? Number(m[2]) : undefined; }
     }
 
+    // Idempotency check: prevent duplicate submissions within 5 seconds
+    const recent = await HealthRecord.findOne({
+      registration: registrationId,
+      createdAt: { $gte: new Date(Date.now() - 5000) }
+    });
+    if (recent && recent.bloodPressure === bloodPressure && recent.sugarLevel == sugarLevel) {
+      return res.status(200).json({ success: true, data: recent, message: "Duplicate prevented" });
+    }
+
     const rec = await HealthRecord.create({
       registration: registrationId,
       bloodPressure: bloodPressure || undefined,
@@ -59,6 +68,21 @@ export const getLatestHealthRecordByMember = async (req, res) => {
     }
     const rec = await HealthRecord.findOne({ registration: req.params.id }).sort({ date: -1 });
     return res.status(200).json({ success: true, data: rec });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── DELETE /api/v1/health-records/:id ──────────────────────────────────────
+export const deleteHealthRecord = async (req, res) => {
+  try {
+    const record = await HealthRecord.findById(req.params.id);
+    if (!record) return res.status(404).json({ success: false, message: 'Record not found' });
+    if (record.isInitial) {
+      return res.status(403).json({ success: false, message: 'Cannot delete the initial admission record.' });
+    }
+    const deleted = await HealthRecord.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ success: true, data: deleted });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

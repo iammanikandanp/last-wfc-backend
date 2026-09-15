@@ -16,6 +16,7 @@ const memberProgressSchema = new mongoose.Schema(
     bmi:     Number,
     notes:  { type: String, default: "" },
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    isInitial: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

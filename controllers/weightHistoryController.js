@@ -14,6 +14,15 @@ export const createWeightHistoryEntry = async (req, res) => {
       return res.status(404).json({ success: false, message: "Member not found" });
     }
 
+    // Idempotency check: prevent duplicate submissions within 5 seconds
+    const recent = await WeightHistory.findOne({
+      registrationId,
+      createdAt: { $gte: new Date(Date.now() - 5000) }
+    });
+    if (recent && recent.weight === Number(weight)) {
+      return res.status(200).json({ success: true, entry: recent, message: "Duplicate prevented" });
+    }
+
     const entry = await WeightHistory.create({
       registrationId,
       memberName: memberName || member.name || "",
@@ -51,6 +60,20 @@ export const getLatestWeightHistoryByMember = async (req, res) => {
   try {
     const latest = await WeightHistory.findOne({ registrationId: req.params.id }).sort({ recordDate: -1, recordTime: -1, createdAt: -1 });
     return res.status(200).json({ success: true, record: latest });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteWeightHistoryEntry = async (req, res) => {
+  try {
+    const record = await WeightHistory.findById(req.params.id);
+    if (!record) return res.status(404).json({ success: false, message: "Record not found" });
+    if (record.isInitial) {
+      return res.status(403).json({ success: false, message: "Cannot delete the initial admission record." });
+    }
+    const deleted = await WeightHistory.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ success: true, data: deleted });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

@@ -14,6 +14,7 @@ const weightHistorySchema = new mongoose.Schema(
     notes: { type: String, default: "" },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     recordType: { type: String, enum: ["initial", "update"], default: "update" },
+    isInitial: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
