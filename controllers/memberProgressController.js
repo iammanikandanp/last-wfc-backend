@@ -30,6 +30,21 @@ export const createProgressRecord = async (req, res) => {
       recordedBy: req.user._id,
     });
 
+    // Determine true latest values based on chronological date
+    const latestRecord = await MemberProgress.findOne({ registration: registrationId }).sort({ date: -1, createdAt: -1 });
+    if (latestRecord) {
+      const { Registration } = await import("../models/registration.js");
+      await Registration.findByIdAndUpdate(registrationId, {
+        ...(latestRecord.weight ? { weight: latestRecord.weight } : {}),
+        ...(latestRecord.height ? { height: latestRecord.height } : {}),
+        ...(latestRecord.waist ? { waist: latestRecord.waist } : {}),
+        ...(latestRecord.hip ? { hip: latestRecord.hip } : {}),
+        ...(latestRecord.neck ? { neck: latestRecord.neck } : {}),
+        ...(latestRecord.bodyFat ? { bodyFat: latestRecord.bodyFat } : {}),
+        ...(latestRecord.bmi ? { bmi: latestRecord.bmi } : {}),
+      });
+    }
+
     return res.status(201).json({ success: true, data: record });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

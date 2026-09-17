@@ -23,13 +23,18 @@ export const processDailyCafeteriaRevenue = async (targetDateStr = null) => {
       return;
     }
 
-    // 2. Calculate TOTAL paid amount across ALL cafeteria transactions in history
-    const allTransactions = await CafeteriaTransaction.find({});
-    const totalPaidEver = allTransactions.reduce((sum, tx) => sum + (tx.paidAmount || 0), 0);
+    // 2. Calculate TOTAL paid amount across ALL cafeteria transactions in history using aggregation
+    const txAggregation = await CafeteriaTransaction.aggregate([
+      { $group: { _id: null, totalPaid: { $sum: "$paidAmount" } } }
+    ]);
+    const totalPaidEver = txAggregation.length > 0 ? txAggregation[0].totalPaid : 0;
 
-    // 3. Calculate TOTAL amount already processed by this cron job in history
-    const pastRevenues = await CafeteriaDailyRevenue.find({ source: "Cafeteria" });
-    const totalProcessedEver = pastRevenues.reduce((sum, rev) => sum + (rev.totalCollectedAmount || 0), 0);
+    // 3. Calculate TOTAL amount already processed by this cron job in history using aggregation
+    const revAggregation = await CafeteriaDailyRevenue.aggregate([
+      { $match: { source: "Cafeteria" } },
+      { $group: { _id: null, totalProcessed: { $sum: "$totalCollectedAmount" } } }
+    ]);
+    const totalProcessedEver = revAggregation.length > 0 ? revAggregation[0].totalProcessed : 0;
 
     // 4. Today's collected amount is the delta
     let todaysRevenue = totalPaidEver - totalProcessedEver;

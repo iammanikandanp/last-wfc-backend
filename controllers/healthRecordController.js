@@ -34,11 +34,14 @@ export const createHealthRecord = async (req, res) => {
       recordedBy: req.user?._id,
     });
 
-    // Update latest values on Registration for quick display (do not delete history)
-    await Registration.findByIdAndUpdate(registrationId, {
-      ...(bloodPressure ? { bloodPressure } : {}),
-      ...(sugarLevel !== undefined && sugarLevel !== '' ? { sugarLevel } : {}),
-    });
+    // Determine true latest values based on chronological date
+    const latestRecord = await HealthRecord.findOne({ registration: registrationId }).sort({ date: -1, createdAt: -1 });
+    if (latestRecord) {
+      await Registration.findByIdAndUpdate(registrationId, {
+        ...(latestRecord.bloodPressure ? { bloodPressure: latestRecord.bloodPressure } : {}),
+        ...(latestRecord.sugarLevel !== undefined ? { sugarLevel: latestRecord.sugarLevel } : {}),
+      });
+    }
 
     return res.status(201).json({ success: true, data: rec });
   } catch (err) {

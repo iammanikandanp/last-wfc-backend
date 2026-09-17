@@ -34,10 +34,16 @@ export const createWeightHistoryEntry = async (req, res) => {
       recordType,
     });
 
-    await Registration.findByIdAndUpdate(registrationId, {
-      weight: Number(weight),
-      updatedAt: new Date(),
-    });
+    // Determine the true latest weight based on chronological recordDate
+    const latestRecord = await WeightHistory.findOne({ registrationId })
+      .sort({ recordDate: -1, recordTime: -1, createdAt: -1 });
+
+    if (latestRecord) {
+      await Registration.findByIdAndUpdate(registrationId, {
+        weight: latestRecord.weight,
+        updatedAt: new Date(),
+      });
+    }
 
     return res.status(201).json({ success: true, entry });
   } catch (error) {
