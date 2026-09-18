@@ -47,7 +47,10 @@ export const getTransactions = async (req, res) => {
 
 export const createTransaction = async (req, res) => {
   try {
-    const { memberId, items = [], paidAmount = 0, paymentMode, transactionType = "member" } = req.body;
+    const { memberId, items = [], paidAmount = 0, paymentMode, transactionType = "member", transactionDate } = req.body;
+    
+    // Determine transaction date
+    const txDate = transactionDate ? new Date(transactionDate) : new Date();
 
     if (transactionType === "admin") {
       if (items.length === 0) return res.status(400).json({ success: false, message: "Items are required" });
@@ -89,7 +92,7 @@ export const createTransaction = async (req, res) => {
         paidAmount: 0,
         extraAmount: 0,
         paymentStatus: "Admin",
-        transactionDate: new Date(),
+        transactionDate: txDate,
         recordedBy: req.user._id,
       });
 
@@ -169,7 +172,7 @@ export const createTransaction = async (req, res) => {
       totalAmount: globalTotalAmount,
       paymentStatus: status,
       paymentMode: paymentMode || "GPay",
-      transactionDate: new Date(),
+      transactionDate: txDate,
       recordedBy: req.user._id,
     });
 
@@ -178,7 +181,7 @@ export const createTransaction = async (req, res) => {
         transactionId: transaction._id,
         amount: paidNum,
         mode: paymentMode,
-        date: new Date()
+        date: txDate
       });
     }
 
