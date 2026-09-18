@@ -1,6 +1,7 @@
 import { Expense } from "../models/Expense.js";
 import cloudinary from "../utils/cloudinary.js";
 import { Readable } from "stream";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── POST /api/v1/expenses ──────────────────────────────────────────────────────
 export const createExpense = async (req, res) => {
@@ -119,14 +120,8 @@ export const deleteExpense = async (req, res) => {
     const expense = await Expense.findById(req.params.id);
     if (!expense) return res.status(404).json({ success: false, message: "Expense not found" });
 
-    if (expense.receiptPublicId) {
-      try {
-        await cloudinary.uploader.destroy(expense.receiptPublicId, { resource_type: "image" });
-      } catch (_) {}
-    }
-
-    await expense.deleteOne();
-    return res.status(200).json({ success: true, message: "Expense deleted" });
+    await moveToRecycleBin(Expense, req.params.id, "Expense", req.user?._id);
+    return res.status(200).json({ success: true, message: "Expense moved to recycle bin" });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

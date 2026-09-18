@@ -1,4 +1,5 @@
 import { ProgressPhotoSession } from "../models/ProgressPhotoSession.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── POST /api/v1/progress-photo-session ───────────────────────────────────────────────
 export const createSession = async (req, res) => {
@@ -61,11 +62,9 @@ export const deleteSession = async (req, res) => {
   try {
     const record = await ProgressPhotoSession.findById(req.params.id);
     if (!record) return res.status(404).json({ success: false, message: "Session not found" });
-    if (record.isInitial) {
-      return res.status(403).json({ success: false, message: "Cannot delete the initial admission record." });
-    }
-    const deleted = await ProgressPhotoSession.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, data: deleted });
+    
+    await moveToRecycleBin(ProgressPhotoSession, req.params.id, "ProgressPhotoSession", req.user?._id);
+    return res.status(200).json({ success: true, message: "Session moved to recycle bin" });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

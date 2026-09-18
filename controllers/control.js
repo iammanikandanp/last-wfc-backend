@@ -4,6 +4,7 @@ import { WeightHistory } from "../models/WeightHistory.js";
 import { MemberProgress } from "../models/MemberProgress.js";
 import { HealthRecord } from "../models/HealthRecord.js";
 import { ProgressPhotoSession } from "../models/ProgressPhotoSession.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 export const register = async (req, res) => {
@@ -211,9 +212,11 @@ export const updatereg = async (req, res) => {
 export const deletereg = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Registration.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ message: "Member not found" });
-    res.status(200).json({ message: "Deleted successfully", data: deleted });
+    const existing = await Registration.findById(id);
+    if (!existing) return res.status(404).json({ message: "Member not found" });
+    
+    await moveToRecycleBin(Registration, id, "Registration", req.user?._id);
+    res.status(200).json({ message: "Member moved to recycle bin", data: existing });
   } catch (err) {
     console.error("Delete error:", err);
     res.status(500).json({ message: "Internal Server Error", error: err.message });

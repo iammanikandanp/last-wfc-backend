@@ -1,4 +1,5 @@
 import { MemberProgress } from "../models/MemberProgress.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── POST /api/v1/member-progress ───────────────────────────────────────────────
 export const createProgressRecord = async (req, res) => {
@@ -74,11 +75,9 @@ export const deleteProgressRecord = async (req, res) => {
   try {
     const record = await MemberProgress.findById(req.params.id);
     if (!record) return res.status(404).json({ success: false, message: "Record not found" });
-    if (record.isInitial) {
-      return res.status(403).json({ success: false, message: "Cannot delete the initial admission record." });
-    }
-    const deleted = await MemberProgress.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, data: deleted });
+    
+    await moveToRecycleBin(MemberProgress, req.params.id, "MemberProgress", req.user?._id);
+    return res.status(200).json({ success: true, message: "Record moved to recycle bin" });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

@@ -1,5 +1,6 @@
 import { WeightHistory } from "../models/WeightHistory.js";
 import { Registration } from "../models/registration.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 export const createWeightHistoryEntry = async (req, res) => {
   try {
@@ -75,11 +76,9 @@ export const deleteWeightHistoryEntry = async (req, res) => {
   try {
     const record = await WeightHistory.findById(req.params.id);
     if (!record) return res.status(404).json({ success: false, message: "Record not found" });
-    if (record.isInitial) {
-      return res.status(403).json({ success: false, message: "Cannot delete the initial admission record." });
-    }
-    const deleted = await WeightHistory.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, data: deleted });
+    
+    await moveToRecycleBin(WeightHistory, req.params.id, "WeightHistory", req.user?._id);
+    return res.status(200).json({ success: true, message: "Record moved to recycle bin" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

@@ -1,5 +1,6 @@
 import { HealthRecord } from "../models/HealthRecord.js";
 import { Registration } from "../models/registration.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── POST /api/v1/health-records ──────────────────────────────────────────────
 export const createHealthRecord = async (req, res) => {
@@ -81,11 +82,9 @@ export const deleteHealthRecord = async (req, res) => {
   try {
     const record = await HealthRecord.findById(req.params.id);
     if (!record) return res.status(404).json({ success: false, message: 'Record not found' });
-    if (record.isInitial) {
-      return res.status(403).json({ success: false, message: 'Cannot delete the initial admission record.' });
-    }
-    const deleted = await HealthRecord.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, data: deleted });
+    
+    await moveToRecycleBin(HealthRecord, req.params.id, "HealthRecord", req.user?._id);
+    return res.status(200).json({ success: true, message: 'Record moved to recycle bin' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

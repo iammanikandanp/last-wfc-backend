@@ -153,6 +153,11 @@ import {
   deleteSession,
 } from "../controllers/progressPhotoSessionController.js";
 
+import {
+  getRecycleBin,
+  restoreItem,
+} from "../controllers/recycleBinController.js";
+
 const router = express.Router();
 
 // Multer for receipt image uploads (memory storage → manual Cloudinary upload)
@@ -392,5 +397,9 @@ router.post("/health-records",                 authorize("admin", "trainer"), cr
 router.get("/health-records/member/:id",       getHealthRecordsByMember);
 router.get("/health-records/member/latest/:id", getLatestHealthRecordByMember);
 router.delete("/health-records/:id",           authorize("admin", "trainer"), deleteHealthRecord);
+
+// ── Recycle Bin ───────────────────────────────────────────────────────────────
+router.get("/recycle-bin",           authorize("admin"), getRecycleBin);
+router.post("/recycle-bin/:id/restore", authorize("admin"), restoreItem);
 
 export default router;

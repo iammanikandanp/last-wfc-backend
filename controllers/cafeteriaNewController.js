@@ -2,6 +2,7 @@ import { CafeteriaStock } from "../models/CafeteriaStock.js";
 import { CafeteriaTransaction } from "../models/CafeteriaTransaction.js";
 import { CafeteriaPayment } from "../models/CafeteriaPayment.js";
 import { Registration } from "../models/registration.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 const isMemberActive = (member) => {
   if (!member?.endDate) return false;
@@ -316,10 +317,10 @@ export const deleteTransaction = async (req, res) => {
       }
     }
 
-    // Delete associated payments
+    // We delete associated payments permanently (or could move to recycle bin if needed)
     await CafeteriaPayment.deleteMany({ transactionId: req.params.id });
 
-    await CafeteriaTransaction.findByIdAndDelete(req.params.id);
+    await moveToRecycleBin(CafeteriaTransaction, req.params.id, "CafeteriaTransaction", req.user?._id);
     return res.status(200).json({ success: true, message: "Transaction deleted successfully" });
   } catch (err) {
     return fmtError(res, err);

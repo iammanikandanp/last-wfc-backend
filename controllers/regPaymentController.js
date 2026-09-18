@@ -2,6 +2,7 @@ import { RegPayment } from "../models/RegPayment.js";
 import { Registration } from "../models/registration.js";
 import { recordAdmissionIncome } from "../utils/recordAdmissionIncome.js";
 import { getNextInvoiceNumber } from "../utils/helpers.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── Create Payment ────────────────────────────────────────────────────────────
 export const createRegPayment = async (req, res) => {
@@ -227,9 +228,11 @@ export const updateRegPayment = async (req, res) => {
 // ── Delete Payment ────────────────────────────────────────────────────────────
 export const deleteRegPayment = async (req, res) => {
   try {
-    const payment = await RegPayment.findByIdAndDelete(req.params.id);
+    const payment = await RegPayment.findById(req.params.id);
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
-    return res.status(200).json({ success: true, message: 'Payment deleted', payment });
+    
+    await moveToRecycleBin(RegPayment, req.params.id, "RegPayment", req.user?._id);
+    return res.status(200).json({ success: true, message: 'Payment moved to recycle bin', payment });
   } catch (err) {
     console.error('deleteRegPayment error:', err);
     return res.status(500).json({ success: false, message: err.message });

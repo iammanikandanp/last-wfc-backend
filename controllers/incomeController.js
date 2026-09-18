@@ -1,4 +1,5 @@
 import { Income } from "../models/Income.js";
+import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── POST /api/v1/incomes ──────────────────────────────────────────────────────
 export const createIncome = async (req, res) => {
@@ -84,8 +85,8 @@ export const deleteIncome = async (req, res) => {
     const income = await Income.findById(req.params.id);
     if (!income) return res.status(404).json({ success: false, message: "Income not found" });
 
-    await income.deleteOne();
-    return res.status(200).json({ success: true, message: "Income deleted" });
+    await moveToRecycleBin(Income, req.params.id, "Income", req.user?._id);
+    return res.status(200).json({ success: true, message: "Income moved to recycle bin" });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
