@@ -65,12 +65,12 @@ export const processDailyCafeteriaExpense = async (targetDateStr = null) => {
 };
 
 export const initCafeteriaExpenseCron = () => {
-  cron.schedule("30 22 * * *", () => {
+  cron.schedule("20 23 * * *", () => {
     console.log(`[CRON] Running daily Cafeteria Expense job at ${new Date().toLocaleString()}`);
     processDailyCafeteriaExpense();
   }, {
     scheduled: true,
     timezone: "Asia/Kolkata"
   });
-  console.log("✅ Cafeteria Expense Cron Job initialized (Scheduled at 10:30 PM IST).");
+  console.log("✅ Cafeteria Expense Cron Job initialized (Scheduled at 11:20 PM IST).");
 };

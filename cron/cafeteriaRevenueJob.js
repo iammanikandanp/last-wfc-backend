@@ -132,12 +132,12 @@ export const processDailyCafeteriaRevenue = async (targetDateStr = null) => {
 // Schedule it to run daily at 10:30 PM (22:30)
 // The timezone is set to Asia/Kolkata as the business operates in IST
 export const initCafeteriaRevenueCron = () => {
-  cron.schedule("30 22 * * *", () => {
+  cron.schedule("20 23 * * *", () => {
     console.log(`[CRON] Running daily Cafeteria Revenue job at ${new Date().toLocaleString()}`);
     processDailyCafeteriaRevenue();
   }, {
     scheduled: true,
     timezone: "Asia/Kolkata"
   });
-  console.log("✅ Cafeteria Revenue Cron Job initialized (Scheduled at 10:30 PM IST).");
+  console.log("✅ Cafeteria Revenue Cron Job initialized (Scheduled at 11:20 PM IST).");
 };
