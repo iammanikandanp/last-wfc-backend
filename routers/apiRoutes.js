@@ -126,6 +126,7 @@ import {
   updateTransaction,
   getDashboard,
   getMemberBalance,
+  getPendingMembers,
   deleteTransaction,
   deleteAllTransactions,
 } from "../controllers/cafeteriaNewController.js";
@@ -357,6 +358,7 @@ router.delete("/cafeteria/transactions",    authorize("admin"), deleteAllTransac
 router.delete("/cafeteria/transactions/:id",authorize("admin"), deleteTransaction);
 router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
 router.get("/cafeteria/member-balance/:id", authorize("admin"), getMemberBalance);
+router.get("/cafeteria/pending-members",    authorize("admin"), getPendingMembers);
 // Stock management (cafeteriaController)
 router.get("/cafeteria/stock",                      authorize("admin"), getAllStock);
 router.post("/cafeteria/stock",                     authorize("admin"), createStockItem);

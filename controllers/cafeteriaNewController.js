@@ -3,6 +3,9 @@ import { CafeteriaTransaction } from "../models/CafeteriaTransaction.js";
 import { CafeteriaPayment } from "../models/CafeteriaPayment.js";
 import { Registration } from "../models/registration.js";
 import { moveToRecycleBin } from "../utils/recycle.js";
+import { processDailyCafeteriaRevenue } from "../cron/cafeteriaRevenueJob.js";
+import { Income } from "../models/Income.js";
+import { CafeteriaDailyRevenue } from "../models/CafeteriaDailyRevenue.js";
 
 const isMemberActive = (member) => {
   if (!member?.endDate) return false;
@@ -18,6 +21,48 @@ export const getMemberBalance = async (req, res) => {
     const transactions = await CafeteriaTransaction.find({ member: id }).sort({ transactionDate: -1 });
     const balance = transactions.reduce((sum, t) => sum + (t.paidAmount || 0) - (t.previousBalanceUsed || 0) - (t.totalAmount || 0), 0);
     return res.status(200).json({ success: true, balance, transactions });
+  } catch (err) {
+    return fmtError(res, err);
+  }
+};
+
+export const getPendingMembers = async (req, res) => {
+  try {
+    const aggregation = await CafeteriaTransaction.aggregate([
+      {
+        $group: {
+          _id: "$member",
+          totalPaid: { $sum: { $subtract: [{ $ifNull: ["$paidAmount", 0] }, { $ifNull: ["$previousBalanceUsed", 0] }] } },
+          totalAmount: { $sum: { $ifNull: ["$totalAmount", 0] } }
+        }
+      },
+      {
+        $project: {
+          pendingAmount: { $subtract: ["$totalAmount", "$totalPaid"] }
+        }
+      },
+      {
+        $match: {
+          pendingAmount: { $gt: 0 }
+        }
+      }
+    ]);
+    
+    const memberIds = aggregation.map(a => a._id).filter(Boolean);
+    const populated = await Registration.find({ _id: { $in: memberIds } }, "name phone images.profileImage");
+    
+    const result = aggregation.filter(a => a._id).map(a => {
+      const m = populated.find(p => p._id.toString() === a._id.toString());
+      return {
+        _id: a._id,
+        name: m ? m.name : "Unknown",
+        phone: m ? m.phone : "",
+        profileImage: m?.images?.profileImage,
+        pendingAmount: a.pendingAmount
+      };
+    });
+    
+    return res.status(200).json({ success: true, data: result });
   } catch (err) {
     return fmtError(res, err);
   }
@@ -97,6 +142,7 @@ export const createTransaction = async (req, res) => {
         recordedBy: req.user._id,
       });
 
+      await processDailyCafeteriaRevenue(transaction.transactionDate).catch(console.error);
       return res.status(201).json({ success: true, transaction });
     }
 
@@ -186,6 +232,7 @@ export const createTransaction = async (req, res) => {
       });
     }
 
+    await processDailyCafeteriaRevenue(transaction.transactionDate).catch(console.error);
     return res.status(201).json({ success: true, data: transaction });
   } catch (err) {
     return fmtError(res, err);
@@ -208,6 +255,8 @@ export const payCafeteriaBalance = async (req, res) => {
       return res.status(400).json({ success: false, message: "No unpaid transactions found for this member" });
     }
 
+    const affectedDates = new Set();
+
     for (const t of allTx) {
       if (paymentAmount <= 0) break;
       
@@ -223,6 +272,7 @@ export const payCafeteriaBalance = async (req, res) => {
           t.paymentStatus = "Paid";
         }
         await t.save();
+        affectedDates.add(t.transactionDate.toISOString());
       }
     }
 
@@ -235,7 +285,12 @@ export const payCafeteriaBalance = async (req, res) => {
         mostRecentTx.extraAmount = Math.max(0, mostRecentTx.paidAmount - mostRecentTx.totalAmount);
         mostRecentTx.paymentStatus = "Paid";
         await mostRecentTx.save();
+        affectedDates.add(mostRecentTx.transactionDate.toISOString());
       }
+    }
+
+    for (const dateStr of affectedDates) {
+      await processDailyCafeteriaRevenue(new Date(dateStr)).catch(console.error);
     }
 
     return res.status(200).json({ success: true, message: "Payment applied successfully" });
@@ -321,6 +376,7 @@ export const deleteTransaction = async (req, res) => {
     await CafeteriaPayment.deleteMany({ transactionId: req.params.id });
 
     await moveToRecycleBin(CafeteriaTransaction, req.params.id, "CafeteriaTransaction", req.user?._id);
+    await processDailyCafeteriaRevenue(transaction.transactionDate).catch(console.error);
     return res.status(200).json({ success: true, message: "Transaction deleted successfully" });
   } catch (err) {
     return fmtError(res, err);
@@ -357,6 +413,11 @@ export const deleteAllTransactions = async (req, res) => {
     await CafeteriaPayment.deleteMany({});
     await CafeteriaTransaction.deleteMany({});
     
+    const revs = await CafeteriaDailyRevenue.find();
+    const incomeIds = revs.map(r => r.incomeRecordId);
+    await Income.deleteMany({ _id: { $in: incomeIds } });
+    await CafeteriaDailyRevenue.deleteMany({});
+
     return res.status(200).json({ success: true, message: "All transaction history deleted successfully" });
   } catch (err) {
     return fmtError(res, err);
@@ -423,6 +484,7 @@ export const updateTransaction = async (req, res) => {
     transaction.paymentStatus = transaction.paidAmount >= transaction.totalAmount ? "Paid" : "Unpaid";
 
     await transaction.save();
+    await processDailyCafeteriaRevenue(transaction.transactionDate).catch(console.error);
 
     return res.status(200).json({ success: true, data: transaction });
   } catch (err) {

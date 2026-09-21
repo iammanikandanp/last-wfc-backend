@@ -4,9 +4,7 @@ import { CafeteriaDailyRevenue } from "../models/CafeteriaDailyRevenue.js";
 import { Income } from "../models/Income.js";
 import { IncomeCategory } from "../models/IncomeCategory.js";
 
-// Helper to get local date string YYYY-MM-DD for IST (since the business runs in India)
-const getLocalDateString = (dateObj) => {
-  // Use en-CA or en-GB to get standard date format, we use en-CA for YYYY-MM-DD
+export const getLocalDateString = (dateObj) => {
   const opts = { timeZone: "Asia/Kolkata", year: 'numeric', month: '2-digit', day: '2-digit' };
   const formatter = new Intl.DateTimeFormat('en-CA', opts);
   return formatter.format(dateObj); // Returns YYYY-MM-DD
@@ -14,41 +12,49 @@ const getLocalDateString = (dateObj) => {
 
 export const processDailyCafeteriaRevenue = async (targetDateStr = null) => {
   try {
-    const businessDate = targetDateStr || getLocalDateString(new Date());
-
-    // 1. Check if we already processed for this businessDate
-    const existing = await CafeteriaDailyRevenue.findOne({ businessDate, source: "Cafeteria" });
-    if (existing) {
-      console.log(`[CRON] Cafeteria revenue for ${businessDate} already processed. Skipping.`);
-      return;
+    let businessDate;
+    if (targetDateStr instanceof Date) {
+        businessDate = getLocalDateString(targetDateStr);
+    } else {
+        businessDate = targetDateStr || getLocalDateString(new Date());
     }
 
-    // 2. Calculate TOTAL paid amount across ALL cafeteria transactions in history using aggregation
+    // 1. Calculate TOTAL collected amount for this specific date
+    const startOfDay = new Date(businessDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(businessDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
     const txAggregation = await CafeteriaTransaction.aggregate([
-      { $group: { _id: null, totalPaid: { $sum: "$paidAmount" } } }
+      {
+        $match: {
+          transactionDate: {
+            $gte: startOfDay,
+            $lte: endOfDay
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalPaid: { $sum: "$paidAmount" },
+          totalPrevUsed: { $sum: "$previousBalanceUsed" }
+        }
+      }
     ]);
-    const totalPaidEver = txAggregation.length > 0 ? txAggregation[0].totalPaid : 0;
-
-    // 3. Calculate TOTAL amount already processed by this cron job in history using aggregation
-    const revAggregation = await CafeteriaDailyRevenue.aggregate([
-      { $match: { source: "Cafeteria" } },
-      { $group: { _id: null, totalProcessed: { $sum: "$totalCollectedAmount" } } }
-    ]);
-    const totalProcessedEver = revAggregation.length > 0 ? revAggregation[0].totalProcessed : 0;
-
-    // 4. Today's collected amount is the delta
-    let todaysRevenue = totalPaidEver - totalProcessedEver;
     
-    // Safety check - if negative due to manual DB edits, just record 0 to prevent issues
+    let todaysRevenue = 0;
+    if (txAggregation.length > 0) {
+      const { totalPaid = 0, totalPrevUsed = 0 } = txAggregation[0];
+      todaysRevenue = totalPaid - totalPrevUsed;
+    }
+
     if (todaysRevenue < 0) {
         console.warn(`[CRON] Warning: Calculated negative revenue (${todaysRevenue}) for Cafeteria on ${businessDate}. Defaulting to 0.`);
         todaysRevenue = 0;
     }
 
-    // If today's revenue is 0 and there are no transactions, we can still post a 0 record just to mark it done,
-    // or we can skip. Creating the record is better to prevent duplicate runs from trying again.
-    
-    // 5. Ensure "Cafeteria Sales" Income Category exists
+    // 2. Ensure "Cafeteria Sales" Income Category exists
     let category = await IncomeCategory.findOne({ name: { $regex: /cafeteria/i } });
     if (!category) {
       category = await IncomeCategory.findOne({ name: { $regex: /food/i } });
@@ -57,41 +63,68 @@ export const processDailyCafeteriaRevenue = async (targetDateStr = null) => {
       category = await IncomeCategory.findOne({ name: { $regex: /sales/i } });
     }
     if (!category) {
-      // Create it
       category = await IncomeCategory.create({
         name: "Cafeteria Sales",
         description: "Revenue from Cafeteria"
       });
     }
 
-    // 6. Create the Income Record
-    const incomeRecord = await Income.create({
-      title: "Today Cafeteria",
-      description: `Cafeteria revenue collected for ${businessDate}`,
-      amount: todaysRevenue,
-      category: category._id,
-      type: "income",
-      paymentMethod: "cash", // Assume mixed or default to cash
-      date: new Date(),
-    });
-
-    // 7. Save the Daily Revenue Record
-    await CafeteriaDailyRevenue.create({
-      businessDate,
-      source: "Cafeteria",
-      description: "Today Cafeteria",
-      totalCollectedAmount: todaysRevenue,
-      incomeRecordId: incomeRecord._id,
-      processedAt: new Date(),
-    });
-
-    console.log(`[CRON] Successfully processed Cafeteria Revenue for ${businessDate}: ₹${todaysRevenue}`);
-  } catch (error) {
-    // If there's a duplicate key error (11000) on CafeteriaDailyRevenue, it means another instance ran at the same time.
-    if (error.code === 11000) {
-       console.log(`[CRON] Race condition caught: Cafeteria revenue for this date already processed.`);
+    // 3. Check if we already processed for this businessDate
+    let existing = await CafeteriaDailyRevenue.findOne({ businessDate, source: "Cafeteria" });
+    
+    if (existing) {
+      // Update existing income record
+      const incomeRecord = await Income.findById(existing.incomeRecordId);
+      if (incomeRecord) {
+        incomeRecord.amount = todaysRevenue;
+        incomeRecord.date = startOfDay; // Ensure it aligns with transactionDate for Expenses filters
+        await incomeRecord.save();
+      } else {
+        // If it was manually deleted from Income, recreate it
+        const newIncomeRecord = await Income.create({
+          title: "Today Cafeteria",
+          description: `Cafeteria revenue collected for ${businessDate}`,
+          amount: todaysRevenue,
+          category: category._id,
+          type: "income",
+          paymentMethod: "cash",
+          date: startOfDay,
+        });
+        existing.incomeRecordId = newIncomeRecord._id;
+      }
+      
+      existing.totalCollectedAmount = todaysRevenue;
+      existing.processedAt = new Date();
+      await existing.save();
+      console.log(`[SYNC] Updated Cafeteria Revenue for ${businessDate}: ₹${todaysRevenue}`);
     } else {
-       console.error(`[CRON] Failed to process daily Cafeteria revenue:`, error);
+      // Create new income record
+      const incomeRecord = await Income.create({
+        title: "Today Cafeteria",
+        description: `Cafeteria revenue collected for ${businessDate}`,
+        amount: todaysRevenue,
+        category: category._id,
+        type: "income",
+        paymentMethod: "cash",
+        date: startOfDay,
+      });
+
+      await CafeteriaDailyRevenue.create({
+        businessDate,
+        source: "Cafeteria",
+        description: "Today Cafeteria",
+        totalCollectedAmount: todaysRevenue,
+        incomeRecordId: incomeRecord._id,
+        processedAt: new Date(),
+      });
+      console.log(`[SYNC] Created Cafeteria Revenue for ${businessDate}: ₹${todaysRevenue}`);
+    }
+
+  } catch (error) {
+    if (error.code === 11000) {
+       console.log(`[SYNC] Race condition caught: Cafeteria revenue for this date already processed.`);
+    } else {
+       console.error(`[SYNC] Failed to process daily Cafeteria revenue:`, error);
     }
   }
 };
