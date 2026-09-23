@@ -164,7 +164,7 @@ export const updatereg = async (req, res) => {
       bodyFat, waist, neck, hip, sugarLevel, bloodPressure,
       attendanceId = "",
       personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = "",
-      goal,
+      goal, isTop10,
     } = req.body;
 
     if (!name) {
@@ -196,6 +196,7 @@ export const updatereg = async (req, res) => {
       attendanceId,
       personalTraining, customWorkout, customDiet, rehabTherapy,
       statusLevel, goal: goal !== undefined ? goal : existing.goal,
+      isTop10: isTop10 !== undefined ? (isTop10 === 'true' || isTop10 === true) : existing.isTop10,
       images: { profileImage, frontBodyImage, sideBodyImage, backBodyImage },
     };
 

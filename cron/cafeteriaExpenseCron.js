@@ -13,9 +13,17 @@ export const processDailyCafeteriaExpense = async (targetDateStr = null) => {
   try {
     const businessDate = targetDateStr || getLocalDateString(new Date());
 
-    // Find all unposted refills from today (or earlier, we just want to post all unposted ones)
-    // To be precise for "today's total", we can just fetch all unposted ones since the cron runs daily.
-    const unpostedRefills = await CafeteriaStockRefill.find({ expensePosted: false });
+    // Calculate start and end of the business date
+    const startOfDay = new Date(businessDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(businessDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Find all unposted refills from today only as requested
+    const unpostedRefills = await CafeteriaStockRefill.find({ 
+      expensePosted: false,
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    });
     
     if (unpostedRefills.length === 0) {
       console.log(`[CRON] No unposted cafeteria refills found for ${businessDate}. Skipping.`);
