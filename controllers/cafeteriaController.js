@@ -153,8 +153,9 @@ export const getConsumptionByDate = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid date" });
     }
 
-    const start = new Date(day); start.setHours(0, 0, 0, 0);
-    const end   = new Date(day); end.setHours(23, 59, 59, 999);
+    const dateStr = day.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const start = new Date(`${dateStr}T00:00:00+05:30`);
+    const end = new Date(`${dateStr}T23:59:59.999+05:30`);
 
     const records = await CafeteriaConsumption.find({ createdAt: { $gte: start, $lte: end } })
       .populate("stock", "itemName unit")

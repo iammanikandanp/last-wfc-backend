@@ -13,11 +13,9 @@ export const processDailyCafeteriaExpense = async (targetDateStr = null) => {
   try {
     const businessDate = targetDateStr || getLocalDateString(new Date());
 
-    // Calculate start and end of the business date
-    const startOfDay = new Date(businessDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(businessDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Calculate start and end of the business date in IST timezone
+    const startOfDay = new Date(`${businessDate}T00:00:00+05:30`);
+    const endOfDay = new Date(`${businessDate}T23:59:59.999+05:30`);
 
     // Find all unposted refills from today only as requested
     const unpostedRefills = await CafeteriaStockRefill.find({ 

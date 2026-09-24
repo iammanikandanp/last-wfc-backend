@@ -20,10 +20,9 @@ export const processDailyCafeteriaRevenue = async (targetDateStr = null) => {
     }
 
     // 1. Calculate TOTAL collected amount for this specific date
-    const startOfDay = new Date(businessDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(businessDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Create Date objects that represent midnight IST and 11:59:59 PM IST for the business date
+    const startOfDay = new Date(`${businessDate}T00:00:00+05:30`);
+    const endOfDay = new Date(`${businessDate}T23:59:59.999+05:30`);
 
     const txAggregation = await CafeteriaTransaction.aggregate([
       {
