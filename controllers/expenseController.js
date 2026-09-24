@@ -131,7 +131,7 @@ export const deleteExpense = async (req, res) => {
 // Returns total grouped by period and category — used by Reports page
 export const getExpenseSummary = async (req, res) => {
   try {
-    const expenses = await Expense.find().populate("category", "name color");
+    const expenses = await Expense.find().populate("category", "name color").lean();
 
     const summary = {
       total: expenses.reduce((s, e) => s + e.amount, 0),

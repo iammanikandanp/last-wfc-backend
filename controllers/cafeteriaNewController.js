@@ -18,7 +18,7 @@ const fmtError = (res, err) => res.status(500).json({ success: false, message: e
 export const getMemberBalance = async (req, res) => {
   try {
     const { id } = req.params;
-    const transactions = await CafeteriaTransaction.find({ member: id }).sort({ transactionDate: -1 });
+    const transactions = await CafeteriaTransaction.find({ member: id }).sort({ transactionDate: -1 }).lean();
     const balance = transactions.reduce((sum, t) => sum + (t.paidAmount || 0) - (t.previousBalanceUsed || 0) - (t.totalAmount || 0), 0);
     return res.status(200).json({ success: true, balance, transactions });
   } catch (err) {
@@ -84,7 +84,8 @@ export const getTransactions = async (req, res) => {
     const records = await CafeteriaTransaction.find(filter)
       .populate("member", "name phone images.profileImage")
       .populate("item", "itemName price")
-      .sort({ transactionDate: -1 });
+      .sort({ transactionDate: -1 })
+      .lean();
     return res.status(200).json({ success: true, data: records });
   } catch (err) {
     return fmtError(res, err);
@@ -303,8 +304,8 @@ export const payCafeteriaBalance = async (req, res) => {
 export const getDashboard = async (req, res) => {
   try {
     const [items, transactions] = await Promise.all([
-      CafeteriaStock.find().sort({ itemName: 1 }),
-      CafeteriaTransaction.find().sort({ transactionDate: -1 }),
+      CafeteriaStock.find().sort({ itemName: 1 }).lean(),
+      CafeteriaTransaction.find().sort({ transactionDate: -1 }).lean(),
     ]);
 
     const summary = {

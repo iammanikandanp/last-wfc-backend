@@ -139,7 +139,7 @@ export const register = async (req, res) => {
 export const fetch = async (req, res) => {
   try {
     // Exclude blocked members from general fetch lists — blocked members are only visible via block-list
-    const fetchAll = await Registration.find({ status: { $ne: "blocked" } });
+    const fetchAll = await Registration.find({ status: { $ne: "blocked" } }).lean();
     res.status(200).json({ message: "fetch all data", data: fetchAll });
   } catch (err) {
     console.log("fetch error:", err);

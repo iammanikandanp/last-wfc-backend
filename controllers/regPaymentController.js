@@ -144,7 +144,7 @@ export const getRegPaymentsByMember = async (req, res) => {
 // ── Revenue Summary ───────────────────────────────────────────────────────────
 export const getRevenueSummary = async (req, res) => {
   try {
-    const all = await RegPayment.find({ paymentStatus: "completed" });
+    const all = await RegPayment.find({ paymentStatus: "completed" }).lean();
 
     const totalRevenue = all.reduce((sum, p) => sum + (p.finalAmount || 0), 0);
 
