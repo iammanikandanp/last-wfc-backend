@@ -37,6 +37,8 @@ images: {
   password: { type: String },
   address: { type: String,   },
   pincode: { type: String,   },
+  dateOfBirth: { type: String }, // Store actual DOB
+
 
   packages: { type: String,   },
   duration: { type: String,   },

@@ -19,12 +19,19 @@ export const protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
 
-    req.user = await User.findById(decoded.id);
-    if (!req.user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
-      });
+    if (decoded.isRegistration) {
+      const { Registration } = await import("../models/registration.js");
+      req.user = await Registration.findById(decoded.id);
+      if (!req.user) {
+        return res.status(404).json({ success: false, message: "Member not found" });
+      }
+      req.user.role = "member";
+      req.user.registrationId = req.user._id;
+    } else {
+      req.user = await User.findById(decoded.id);
+      if (!req.user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
     }
 
     next();

@@ -70,13 +70,13 @@ export const registerUser = async (req, res) => {
 // Login
 export const loginUser = async (req, res) => {
   try {
-    const { email, phone, password } = req.body;
+    const { email, phone, password, role } = req.body;
 
     // Validation
-    if ((!email && !phone) || !password) {
+    if ((!email && !phone) || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: "Please provide email/phone and password",
+        message: "Please provide email/phone, password, and select a role",
       });
     }
 
@@ -99,6 +99,14 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid credentials",
+      });
+    }
+
+    // Check Role
+    if (user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        message: `Account is not authorized for ${role} access`,
       });
     }
 
@@ -148,13 +156,37 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// Get current user
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    // req.user is already populated by the auth middleware (protect),
+    // properly handling both User (admin/trainer) and Registration (member).
+    // Ensure we don't accidentally send sensitive data like passwords.
+    const user = req.user.toObject ? req.user.toObject() : req.user;
+    delete user.password;
+    
+    // Explicitly enforce the role for members so it persists through navbar refresh
+    if (user.role === 'member' || req.user.role === 'member') {
+        user.role = 'member';
+        user.id = user._id; // Ensure id mapping exists
+    }
+
     res.status(200).json({
       success: true,
-      user,
+      user: {
+        id: user._id || user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        canManagePayments: user.canManagePayments,
+        registrationId: user.registrationId,
+        profession: user.profession,
+        experience: user.experience,
+        bio: user.bio,
+        profilePhoto: user.profilePhoto,
+        profileImage: user.images?.profileImage || "",
+        status: user.status
+      },
     });
   } catch (error) {
     res.status(500).json({

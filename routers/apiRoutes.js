@@ -13,6 +13,7 @@ import {
   updateProfile,
   getAllUsers,
 } from "../controllers/authController.js";
+import { memberLogin } from "../controllers/memberAuthController.js";
 
 // ── Feature Controllers ───────────────────────────────────────────────────────
 import { deletereg, fetch, fetchOne, register, updatereg } from "../controllers/control.js";
@@ -191,6 +192,7 @@ const csvUpload = multer({
 // ── Auth ──────────────────────────────────────────────────────────────────────
 router.post("/auth/register",       registerUser);
 router.post("/auth/login",          loginUser);
+router.post("/member/auth/login",   memberLogin);
 router.post("/auth/forgot-password", forgotPassword);
 router.post("/auth/reset-password", resetPassword);
 
@@ -357,7 +359,7 @@ router.put("/cafeteria/transactions/:id",   authorize("admin"), updateTransactio
 router.delete("/cafeteria/transactions",    authorize("admin"), deleteAllTransactions);
 router.delete("/cafeteria/transactions/:id",authorize("admin"), deleteTransaction);
 router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
-router.get("/cafeteria/member-balance/:id", authorize("admin"), getMemberBalance);
+router.get("/cafeteria/member-balance/:id", getMemberBalance);
 router.get("/cafeteria/pending-members",    authorize("admin"), getPendingMembers);
 // Stock management (cafeteriaController)
 router.get("/cafeteria/stock",                      authorize("admin"), getAllStock);

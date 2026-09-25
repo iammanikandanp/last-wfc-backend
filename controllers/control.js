@@ -1,5 +1,6 @@
 import { Registration } from "../models/registration.js";
 import { User } from "../models/User.js";
+import bcrypt from "bcryptjs";
 import { WeightHistory } from "../models/WeightHistory.js";
 import { MemberProgress } from "../models/MemberProgress.js";
 import { HealthRecord } from "../models/HealthRecord.js";
@@ -17,10 +18,11 @@ export const register = async (req, res) => {
       sugarLevel, bloodPressure, attendanceId = "",
       personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = "",
       goal = "",
+      dateOfBirth = "",
     } = req.body;
-    console.log("Register body:", req.body);
-
-    console.log("Register Request body:", req.body);
+    // Exclude sensitive data from logs
+    const { dateOfBirth: _dob, password: _pw, ...safeBody } = req.body;
+    console.log("Register body:", safeBody);
     console.log("Register Request files:", req.files);
 
     // Image paths from multer
@@ -38,6 +40,32 @@ export const register = async (req, res) => {
     if (gender === "Male"   && (age > 40 || bmi > 25 || bodyFat > 20)) statusLevel = "High";
     if (gender === "Female" && (age > 40 || bmi > 24 || bodyFat > 30)) statusLevel = "High";
 
+    // Normalize phone and check duplicate
+    let normalizedPhone = phone || "";
+    if (normalizedPhone) {
+      normalizedPhone = normalizedPhone.replace(/\s+/g, "");
+      const existingRegistration = await Registration.findOne({ phone: normalizedPhone });
+      if (existingRegistration) {
+        return res.status(400).json({ message: "Mobile number already exists." });
+      }
+    }
+
+    // Format DOB if it comes as YYYY-MM-DD
+    let formattedDOB = dateOfBirth;
+    if (dateOfBirth && dateOfBirth.includes("-")) {
+      const parts = dateOfBirth.split("-");
+      if (parts.length === 3 && parts[0].length === 4) { // YYYY-MM-DD
+        formattedDOB = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+
+    // Hash DOB as password
+    let hashedPassword = "";
+    if (formattedDOB) {
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(formattedDOB, salt);
+    }
+
     const newUser = new Registration({
       name, age, gender, emails, height, weight, bmi, bloodGroup,
       issues, description, profession, phone, address, pincode,
@@ -47,6 +75,9 @@ export const register = async (req, res) => {
       personalTraining, customWorkout, customDiet, rehabTherapy,
       statusLevel, goal,
       images: { profileImage, frontBodyImage, sideBodyImage, backBodyImage },
+      phone: normalizedPhone,
+      dateOfBirth: formattedDOB,
+      password: hashedPassword,
     });
 
     const savedUser = await newUser.save();
@@ -153,7 +184,9 @@ export const updatereg = async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log("Update body:", req.body);
+    // Exclude sensitive data from logs
+    const { dateOfBirth: _dob, password: _pw, ...safeBody } = req.body;
+    console.log("Update body:", safeBody);
     console.log("Update files:", req.files);
 
     // req.body is parsed by multer — all form fields arrive as strings
@@ -164,7 +197,7 @@ export const updatereg = async (req, res) => {
       bodyFat, waist, neck, hip, sugarLevel, bloodPressure,
       attendanceId = "",
       personalTraining = "", customWorkout = "", customDiet = "", rehabTherapy = "",
-      goal, isTop10,
+      goal, isTop10, dateOfBirth,
     } = req.body;
 
     if (!name) {
@@ -188,6 +221,27 @@ export const updatereg = async (req, res) => {
     if (gender === "Male"   && (age > 40 || bmi > 25 || bodyFat > 20)) statusLevel = "High";
     if (gender === "Female" && (age > 40 || bmi > 24 || bodyFat > 30)) statusLevel = "High";
 
+    // Handle dateOfBirth update
+    let formattedDOB = existing.dateOfBirth;
+    let newPassword = existing.password;
+
+    if (dateOfBirth && dateOfBirth !== "") {
+      // Format DOB if it comes as YYYY-MM-DD
+      let tempDOB = dateOfBirth;
+      if (tempDOB.includes("-")) {
+        const parts = tempDOB.split("-");
+        if (parts.length === 3 && parts[0].length === 4) { // YYYY-MM-DD
+          tempDOB = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+      }
+
+      if (tempDOB !== existing.dateOfBirth) {
+        formattedDOB = tempDOB;
+        const salt = await bcrypt.genSalt(10);
+        newPassword = await bcrypt.hash(tempDOB, salt);
+      }
+    }
+
     const updateData = {
       name, age, gender, emails, height, weight, bmi, bloodGroup,
       issues, description, profession, phone, address, pincode,
@@ -198,6 +252,8 @@ export const updatereg = async (req, res) => {
       statusLevel, goal: goal !== undefined ? goal : existing.goal,
       isTop10: isTop10 !== undefined ? (isTop10 === 'true' || isTop10 === true) : existing.isTop10,
       images: { profileImage, frontBodyImage, sideBodyImage, backBodyImage },
+      dateOfBirth: formattedDOB,
+      password: newPassword,
     };
 
     const updatedUser = await Registration.findByIdAndUpdate(id, updateData, { new: true });
