@@ -27,6 +27,14 @@ export const protect = async (req, res, next) => {
       }
       req.user.role = "member";
       req.user.registrationId = req.user._id;
+      
+      // Enforce read-only access for members
+      if (req.method !== 'GET') {
+        return res.status(403).json({
+          success: false,
+          message: "Read-only access: Members are not allowed to modify data."
+        });
+      }
     } else {
       req.user = await User.findById(decoded.id);
       if (!req.user) {
