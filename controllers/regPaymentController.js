@@ -1,7 +1,7 @@
 import { RegPayment } from "../models/RegPayment.js";
 import { Registration } from "../models/registration.js";
 import { recordAdmissionIncome } from "../utils/recordAdmissionIncome.js";
-import { getNextInvoiceNumber } from "../utils/helpers.js";
+import { getNextInvoiceNumber, parseLocalDate, toLocalDateStr } from "../utils/helpers.js";
 import { moveToRecycleBin } from "../utils/recycle.js";
 
 // ── Create Payment ────────────────────────────────────────────────────────────
@@ -28,14 +28,35 @@ export const createRegPayment = async (req, res) => {
       nextDueDate,
     } = req.body;
 
-    if (!registrationId || !pkg || !amount || !paymentMode) {
+    if (!registrationId || !pkg || amount === undefined || amount === null || !paymentMode) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields: registrationId, package, amount, paymentMode",
       });
     }
 
-    const invoiceNo = await getNextInvoiceNumber();
+    // Validate dates
+    const parsedStartDate = parseLocalDate(startDate);
+    const parsedEndDate   = parseLocalDate(endDate);
+
+    if (!parsedStartDate || isNaN(parsedStartDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid start date is required",
+      });
+    }
+    if (!parsedEndDate || isNaN(parsedEndDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid end date is required",
+      });
+    }
+    if (parsedEndDate <= parsedStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: "End date must be after start date",
+      });
+    }
 
     // Fetch member details from Registration
     const member = await Registration.findById(registrationId);
@@ -46,6 +67,26 @@ export const createRegPayment = async (req, res) => {
     if (member.status === 'blocked') {
       return res.status(403).json({ success: false, message: "Member is blocked and cannot receive payments via this API" });
     }
+
+    // Prevent duplicate package extensions submitted in quick succession (< 10 seconds)
+    const duplicateWindow = new Date(Date.now() - 10000);
+    const recentDuplicate = await RegPayment.findOne({
+      registrationId,
+      package: pkg,
+      amount: Number(amount),
+      startDate: parsedStartDate,
+      endDate: parsedEndDate,
+      createdAt: { $gte: duplicateWindow },
+    });
+    if (recentDuplicate) {
+      return res.status(409).json({
+        success: false,
+        message: "A payment with identical details was just submitted. Duplicate prevented.",
+        payment: recentDuplicate,
+      });
+    }
+
+    const invoiceNo = await getNextInvoiceNumber();
 
     const payment = new RegPayment({
       registrationId,
@@ -58,14 +99,14 @@ export const createRegPayment = async (req, res) => {
       finalAmount:   Number(finalAmount),
       paymentMode,
       paymentType:   paymentType || 'full',
-      isRenewal: Boolean(isRenewal),
+      isRenewal:     Boolean(isRenewal),
       advanceAmount: Number(advanceAmount) || Number(finalAmount),
       balanceAmount: Number(balanceAmount) || 0,
       paymentStatus: "completed",
       invoiceNo,
-      startDate:     startDate ? new Date(startDate) : new Date(),
-      endDate:       endDate   ? new Date(endDate)   : null,
-      issuedDate:    issuedDate ? new Date(issuedDate) : new Date(),
+      startDate:     parsedStartDate,
+      endDate:       parsedEndDate,
+      issuedDate:    issuedDate ? parseLocalDate(issuedDate) : new Date(),
       nextDueDate:   nextDueDate ? new Date(nextDueDate) : null,
       renewalDate:   renewalDate ? new Date(renewalDate) : new Date(),
       duration:      duration ? Number(duration) : null,
@@ -75,23 +116,42 @@ export const createRegPayment = async (req, res) => {
 
     await payment.save();
 
-    // Also update the member's endDate so membership status stays accurate
-    if (endDate) {
-      await Registration.findByIdAndUpdate(registrationId, {
-        endDate:  new Date(endDate),
-        startDate: startDate ? new Date(startDate) : new Date(),
-        packages: pkg,
-      });
+    // Safely update member: preserve existing membership length without overwriting or shortening
+    let finalMemberEndDate = parsedEndDate;
+    if (member.endDate) {
+      const existingEnd = parseLocalDate(member.endDate);
+      if (existingEnd && existingEnd > parsedEndDate) {
+        finalMemberEndDate = existingEnd;
+      }
     }
+
+    // Preserve ongoing membership start date if the member is currently active
+    const todayMidnight = parseLocalDate(toLocalDateStr(new Date()));
+    let finalMemberStartDate = parsedStartDate;
+    if (member.startDate && member.endDate) {
+      const existingStart = parseLocalDate(member.startDate);
+      const existingEnd   = parseLocalDate(member.endDate);
+      if (existingStart && existingEnd && existingStart <= todayMidnight && existingEnd >= todayMidnight) {
+        finalMemberStartDate = existingStart;
+      }
+    }
+
+    await Registration.findByIdAndUpdate(registrationId, {
+      endDate:   finalMemberEndDate,
+      startDate: finalMemberStartDate,
+      packages:  pkg,
+      status:    "active",
+      ...(duration ? { duration: String(duration) } : {}),
+    });
 
     // Reflect the amount actually collected as Income → Admission
     await recordAdmissionIncome({
       amountPaid: payment.advanceAmount,
       memberName: payment.memberName,
-      invoiceNo: payment.invoiceNo,
+      invoiceNo:  payment.invoiceNo,
       paymentMode: payment.paymentMode,
-      date: payment.issuedDate,
-      createdBy: req.user._id,
+      date:       payment.issuedDate,
+      createdBy:  req.user._id,
     });
 
     return res.status(201).json({
