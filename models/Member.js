@@ -69,9 +69,34 @@ const memberSchema = new mongoose.Schema(
     expiryDate: Date,
     status: {
       type: String,
-      enum: ["active", "inactive", "expired", "suspended"],
+      enum: ["active", "inactive", "expired", "suspended", "hold"],
       default: "active",
     },
+
+    // Hold / Freeze Membership
+    isOnHold: { type: Boolean, default: false },
+    holdStartDate: Date,
+    scheduledResumeDate: Date,
+    actualHoldEndDate: Date,
+    holdReason: { type: String, default: "" },
+    frozenRemainingDays: { type: Number, default: 0 },
+    originalEndDateBeforeHold: Date,
+    holdHistory: [
+      {
+        holdStartDate: Date,
+        scheduledResumeDate: Date,
+        actualHoldEndDate: Date,
+        daysHeld: Number,
+        frozenRemainingDays: Number,
+        reason: { type: String, default: "" },
+        newEndDate: Date,
+        status: { type: String, enum: ["active", "completed", "cancelled"], default: "active" },
+        heldBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        unheldBy: mongoose.Schema.Types.Mixed,
+        heldAt: { type: Date, default: Date.now },
+        unheldAt: Date,
+      },
+    ],
 
     // Additional Services
     personalTraining: Boolean,

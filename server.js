@@ -5,6 +5,7 @@ import router from "./routers/apiRoutes.js";
 import cors from "cors";
 import { initCafeteriaRevenueCron } from "./cron/cafeteriaRevenueJob.js";
 import { initCafeteriaExpenseCron } from "./cron/cafeteriaExpenseCron.js";
+import { initMemberHoldResumeCron } from "./cron/memberHoldResumeJob.js";
 import { migrateInitialRecords } from "./utils/migrateInitialRecords.js";
 
 dotenv.config();
@@ -100,4 +101,5 @@ app.listen(port, () => {
   });
   initCafeteriaRevenueCron();
   initCafeteriaExpenseCron();
+  initMemberHoldResumeCron();
 });

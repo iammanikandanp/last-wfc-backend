@@ -139,9 +139,19 @@ export const getCalendarDiffDays = (endDate, referenceDate = new Date()) => {
 };
 
 // Calculates suggested next package start date based on existing membership
-export const getSuggestedStartDate = (memberEndDate, memberStatus, referenceDate = new Date()) => {
+export const getSuggestedStartDate = (memberEndDate, memberStatus, referenceDate = new Date(), member = null) => {
   const todayStr = toLocalDateStr(referenceDate);
   const today = parseLocalDate(todayStr);
+
+  if (member?.isOnHold || memberStatus === 'hold') {
+    return {
+      startDate: todayStr,
+      hasActiveMembership: false,
+      isOnHold: true,
+      remainingDays: member?.frozenRemainingDays || 0,
+      existingEndDate: memberEndDate ? toLocalDateStr(memberEndDate) : null,
+    };
+  }
 
   if (!memberEndDate || memberStatus === 'blocked') {
     return {
@@ -182,19 +192,26 @@ export const getSuggestedStartDate = (memberEndDate, memberStatus, referenceDate
 };
 
 // Check if membership is expiring soon (within 7 days)
-export const isExpiringsoon = (expiryDate) => {
+export const isExpiringsoon = (expiryDate, member = null) => {
+  if (member?.isOnHold || member?.status === 'hold') return false;
   const diffDays = getCalendarDiffDays(expiryDate);
   return diffDays !== null && diffDays >= 0 && diffDays <= 7;
 };
 
 // Check if membership is overdue
-export const isOverdue = (expiryDate) => {
+export const isOverdue = (expiryDate, member = null) => {
+  if (member?.isOnHold || member?.status === 'hold') return false;
   const diffDays = getCalendarDiffDays(expiryDate);
   return diffDays !== null && diffDays < 0;
 };
 
 // Compute membership status from start/end dates
-export const computeMembershipStatus = (startDate, endDate) => {
+export const computeMembershipStatus = (startDate, endDate, member = null) => {
+  if (typeof endDate === 'object' && endDate !== null && !(endDate instanceof Date) && member === null && (endDate.isOnHold !== undefined || endDate.status !== undefined || endDate._id !== undefined)) {
+    member = endDate;
+    endDate = startDate;
+  }
+  if (member?.isOnHold || member?.status === 'hold') return "hold";
   if (!startDate && !endDate) return "pending";
   if (!endDate) return "active";
   const diffDays = getCalendarDiffDays(endDate);

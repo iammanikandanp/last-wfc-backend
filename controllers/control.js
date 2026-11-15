@@ -6,6 +6,7 @@ import { MemberProgress } from "../models/MemberProgress.js";
 import { HealthRecord } from "../models/HealthRecord.js";
 import { ProgressPhotoSession } from "../models/ProgressPhotoSession.js";
 import { moveToRecycleBin } from "../utils/recycle.js";
+import { resumeMemberHold } from "./memberHoldController.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 export const register = async (req, res) => {
@@ -292,8 +293,14 @@ export const fetchOne = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const user = await Registration.findById(id);
+    let user = await Registration.findById(id);
     if (!user) return res.status(404).json({ message: "Member not found" });
+
+    // Auto-resume if 30-day hold period has completed
+    if (user.isOnHold && user.scheduledResumeDate && new Date(user.scheduledResumeDate) <= new Date()) {
+      user = await resumeMemberHold(user, "system");
+    }
+
     res.status(200).json({ message: "fetch one data", data: user });
   } catch (err) {
     console.error("fetchOne error:", err);

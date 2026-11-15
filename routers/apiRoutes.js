@@ -17,6 +17,7 @@ import { memberLogin } from "../controllers/memberAuthController.js";
 
 // ── Feature Controllers ───────────────────────────────────────────────────────
 import { deletereg, fetch, fetchOne, register, updatereg } from "../controllers/control.js";
+import { holdMember, unholdMember, getMemberHoldHistory } from "../controllers/memberHoldController.js";
 import {
   createRegPayment,
   getAllRegPayments,
@@ -244,6 +245,9 @@ router.post(
   updatereg
 );
 router.post("/delete/:id", authorize("admin"), deletereg);
+router.post("/members/:id/hold", authorize("admin"), holdMember);
+router.post("/members/:id/unhold", authorize("admin"), unholdMember);
+router.get("/members/:id/hold-history", authorize("admin", "trainer"), getMemberHoldHistory);
 
 // ── Payments ──────────────────────────────────────────────────────────────────
 router.post("/reg-payments", (req, res, next) => {
