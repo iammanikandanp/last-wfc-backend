@@ -40,6 +40,15 @@ const regPaymentSchema = new mongoose.Schema(
     writtenOffAt:  { type: Date },
     nextDueDate:   { type: Date },
     dueDate:       { type: Date },
+    paymentHistory: [
+      {
+        amount: { type: Number, required: true },
+        paymentMode: { type: String, required: true },
+        date: { type: Date, default: Date.now },
+        recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        note: { type: String, default: "" },
+      }
+    ],
   },
   { timestamps: true }
 );

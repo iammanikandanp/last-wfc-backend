@@ -249,49 +249,69 @@ export const createTransaction = async (req, res) => {
 export const payCafeteriaBalance = async (req, res) => {
   try {
     const { id: memberId } = req.params;
-    const { amount } = req.body;
+    const { amount, paymentMode = "Cash", date } = req.body;
     let paymentAmount = Number(amount);
 
     if (Number.isNaN(paymentAmount) || paymentAmount <= 0) {
       return res.status(400).json({ success: false, message: "Valid payment amount is required" });
     }
 
+    const rawMode = String(paymentMode || "Cash").trim();
+    const mode = rawMode.toLowerCase() === "gpay" ? "GPay" : "Cash";
+    const txDate = date ? new Date(date) : new Date();
+
     const allTx = await CafeteriaTransaction.find({ member: memberId, paymentStatus: "Unpaid" }).sort({ transactionDate: 1 });
-    
-    if (allTx.length === 0) {
-      return res.status(400).json({ success: false, message: "No unpaid transactions found for this member" });
-    }
-
     const affectedDates = new Set();
+    const initialAmount = paymentAmount;
 
-    for (const t of allTx) {
-      if (paymentAmount <= 0) break;
-      
-      const balanceDue = Math.max(0, t.totalAmount - t.paidAmount);
-      if (balanceDue > 0) {
-        const applyAmount = Math.min(balanceDue, paymentAmount);
-        t.paidAmount += applyAmount;
-        t.newPaymentAmount = (t.newPaymentAmount || 0) + applyAmount;
-        paymentAmount -= applyAmount;
+    if (allTx.length > 0) {
+      for (const t of allTx) {
+        if (paymentAmount <= 0) break;
         
-        t.extraAmount = Math.max(0, t.paidAmount - t.totalAmount);
-        if (t.paidAmount >= t.totalAmount) {
-          t.paymentStatus = "Paid";
+        const balanceDue = Math.max(0, t.totalAmount - t.paidAmount);
+        if (balanceDue > 0) {
+          const applyAmount = Math.min(balanceDue, paymentAmount);
+          t.paidAmount += applyAmount;
+          t.newPaymentAmount = (t.newPaymentAmount || 0) + applyAmount;
+          t.paymentMode = mode;
+          paymentAmount -= applyAmount;
+          
+          t.extraAmount = Math.max(0, t.paidAmount - t.totalAmount);
+          if (t.paidAmount >= t.totalAmount) {
+            t.paymentStatus = "Paid";
+          }
+          await t.save();
+
+          await CafeteriaPayment.create({
+            transactionId: t._id,
+            amount: applyAmount,
+            mode,
+            date: txDate,
+          });
+
+          affectedDates.add(t.transactionDate.toISOString());
         }
-        await t.save();
-        affectedDates.add(t.transactionDate.toISOString());
       }
     }
 
-    // If there is STILL leftover payment amount, we need to apply it to the MOST RECENT transaction to generate Extra Credit
+    // If there is STILL leftover payment amount, apply it to the MOST RECENT transaction to generate Extra Credit
     if (paymentAmount > 0) {
       const mostRecentTx = await CafeteriaTransaction.findOne({ member: memberId }).sort({ transactionDate: -1 });
       if (mostRecentTx) {
         mostRecentTx.paidAmount += paymentAmount;
         mostRecentTx.newPaymentAmount = (mostRecentTx.newPaymentAmount || 0) + paymentAmount;
         mostRecentTx.extraAmount = Math.max(0, mostRecentTx.paidAmount - mostRecentTx.totalAmount);
+        mostRecentTx.paymentMode = mode;
         mostRecentTx.paymentStatus = "Paid";
         await mostRecentTx.save();
+
+        await CafeteriaPayment.create({
+          transactionId: mostRecentTx._id,
+          amount: paymentAmount,
+          mode,
+          date: txDate,
+        });
+
         affectedDates.add(mostRecentTx.transactionDate.toISOString());
       }
     }
@@ -300,7 +320,10 @@ export const payCafeteriaBalance = async (req, res) => {
       await processDailyCafeteriaRevenue(new Date(dateStr)).catch(console.error);
     }
 
-    return res.status(200).json({ success: true, message: "Payment applied successfully" });
+    return res.status(200).json({
+      success: true,
+      message: `₹${initialAmount.toLocaleString("en-IN")} cafeteria payment recorded successfully`,
+    });
   } catch (err) {
     return fmtError(res, err);
   }

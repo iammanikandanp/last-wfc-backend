@@ -26,6 +26,7 @@ import {
   patchPdfUrl,
   updateRegPayment,
   deleteRegPayment,
+  collectPaymentInstallment,
 } from "../controllers/regPaymentController.js";
 import {
   createRegDietPlan,
@@ -131,6 +132,7 @@ import {
   getPendingMembers,
   deleteTransaction,
   deleteAllTransactions,
+  payCafeteriaBalance,
 } from "../controllers/cafeteriaNewController.js";
 import {
   createProgressRecord,
@@ -264,6 +266,7 @@ router.put("/reg-payments/:id", (req, res, next) => {
   if (req.user.role === "trainer" && req.user.canManagePayments) return next();
   return res.status(403).json({ success: false, message: "Not authorized to update payments" });
 }, updateRegPayment);
+router.post("/reg-payments/:id/collect", authorize("admin"), collectPaymentInstallment);
 router.delete("/reg-payments/:id",          authorize("admin"), deleteRegPayment);
 
 // ── RegDiet Plans ─────────────────────────────────────────────────────────────
@@ -365,6 +368,7 @@ router.delete("/cafeteria/transactions/:id",authorize("admin"), deleteTransactio
 router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
 router.get("/cafeteria/member-balance/:id", getMemberBalance);
 router.get("/cafeteria/pending-members",    authorize("admin"), getPendingMembers);
+router.post("/cafeteria/member-payment/:id", authorize("admin"), payCafeteriaBalance);
 // Stock management (cafeteriaController)
 router.get("/cafeteria/stock",                      authorize("admin"), getAllStock);
 router.post("/cafeteria/stock",                     authorize("admin"), createStockItem);

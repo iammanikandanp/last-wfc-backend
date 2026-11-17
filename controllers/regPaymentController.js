@@ -442,3 +442,93 @@ export const deleteRegPayment = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── Quick Update / Collect Additional Payment ─────────────────────────────────
+export const collectPaymentInstallment = async (req, res) => {
+  try {
+    const { amount, paymentMode = "cash", paymentDate, note = "" } = req.body;
+    const paymentAmount = Number(amount);
+
+    if (Number.isNaN(paymentAmount) || paymentAmount <= 0) {
+      return res.status(400).json({ success: false, message: "Please enter a valid payment amount greater than 0" });
+    }
+
+    const payment = await RegPayment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ success: false, message: "Payment record not found" });
+    }
+
+    const currentBalance = Number(payment.balanceAmount || 0);
+    if (currentBalance > 0 && paymentAmount > currentBalance) {
+      return res.status(400).json({
+        success: false,
+        message: `Payment amount (₹${paymentAmount.toLocaleString("en-IN")}) cannot exceed the remaining balance (₹${currentBalance.toLocaleString("en-IN")})`,
+      });
+    }
+
+    const parsedDate = paymentDate ? parseLocalDate(toLocalDateStr(paymentDate)) : new Date();
+    const rawMode = String(paymentMode || payment.paymentMode || "cash").toLowerCase();
+    const normalizedMode = rawMode === "gpay" ? "upi" : ["cash", "upi", "card"].includes(rawMode) ? rawMode : "cash";
+
+    // 1. Initialize paymentHistory with previous advance if not already present
+    if (!Array.isArray(payment.paymentHistory)) {
+      payment.paymentHistory = [];
+    }
+    if (payment.paymentHistory.length === 0 && (payment.advanceAmount || 0) > 0) {
+      payment.paymentHistory.push({
+        amount: Number(payment.advanceAmount),
+        paymentMode: payment.paymentMode || "cash",
+        date: payment.issuedDate || payment.createdAt || new Date(),
+        note: "Initial payment",
+      });
+    }
+
+    // 2. Append new installment transaction
+    payment.paymentHistory.push({
+      amount: paymentAmount,
+      paymentMode: normalizedMode,
+      date: parsedDate,
+      recordedBy: req.user?._id,
+      note: note || "Additional payment collected",
+    });
+
+    // 3. Update cumulative totals
+    payment.advanceAmount = (Number(payment.advanceAmount) || 0) + paymentAmount;
+    payment.balanceAmount = Math.max(0, (Number(payment.finalAmount) || Number(payment.amount) || 0) - payment.advanceAmount);
+    payment.paymentMode = normalizedMode; // set latest payment mode
+    payment.issuedDate = parsedDate;
+
+    if (payment.balanceAmount === 0) {
+      payment.paymentType = "full";
+      payment.paymentStatus = "completed";
+      payment.writtenOff = false;
+      payment.writtenOffAt = null;
+    } else {
+      payment.paymentType = "partly";
+    }
+
+    // Clear cached PDF invoice URL so any newly downloaded invoice reflects the updated paid balance
+    payment.pdfUrl = "";
+
+    await payment.save();
+
+    // 4. Record newly collected money as Admission Income
+    await recordAdmissionIncome({
+      amountPaid: paymentAmount,
+      memberName: payment.memberName,
+      invoiceNo: payment.invoiceNo,
+      paymentMode: normalizedMode,
+      date: parsedDate,
+      createdBy: req.user?._id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `₹${paymentAmount.toLocaleString("en-IN")} collected successfully`,
+      payment,
+    });
+  } catch (err) {
+    console.error("collectPaymentInstallment error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
