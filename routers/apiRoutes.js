@@ -360,24 +360,24 @@ router.delete("/block-list/:id", authorize("admin", "trainer"), deleteBlockEntry
 
 // ── Cafeteria ─────────────────────────────────────────────────────────────────
 
-router.get("/cafeteria/transactions",       authorize("admin"), getTransactions);
-router.post("/cafeteria/transactions",      authorize("admin"), createTransaction);
-router.put("/cafeteria/transactions/:id",   authorize("admin"), updateTransaction);
+router.get("/cafeteria/transactions",       authorize("admin", "trainer"), getTransactions);
+router.post("/cafeteria/transactions",      authorize("admin", "trainer"), createTransaction);
+router.put("/cafeteria/transactions/:id",   authorize("admin", "trainer"), updateTransaction);
 router.delete("/cafeteria/transactions",    authorize("admin"), deleteAllTransactions);
 router.delete("/cafeteria/transactions/:id",authorize("admin"), deleteTransaction);
-router.get("/cafeteria/dashboard",          authorize("admin"), getDashboard);
+router.get("/cafeteria/dashboard",          authorize("admin", "trainer"), getDashboard);
 router.get("/cafeteria/member-balance/:id", getMemberBalance);
-router.get("/cafeteria/pending-members",    authorize("admin"), getPendingMembers);
-router.post("/cafeteria/member-payment/:id", authorize("admin"), payCafeteriaBalance);
+router.get("/cafeteria/pending-members",    authorize("admin", "trainer"), getPendingMembers);
+router.post("/cafeteria/member-payment/:id", authorize("admin", "trainer"), payCafeteriaBalance);
 // Stock management (cafeteriaController)
-router.get("/cafeteria/stock",                      authorize("admin"), getAllStock);
-router.post("/cafeteria/stock",                     authorize("admin"), createStockItem);
-router.put("/cafeteria/stock/:id",                  authorize("admin"), updateStockItem);
+router.get("/cafeteria/stock",                      authorize("admin", "trainer"), getAllStock);
+router.post("/cafeteria/stock",                     authorize("admin", "trainer"), createStockItem);
+router.put("/cafeteria/stock/:id",                  authorize("admin", "trainer"), updateStockItem);
 router.delete("/cafeteria/stock/:id",               authorize("admin"), deleteStockItem);
-router.post("/cafeteria/stock/:id/refill",          authorize("admin"), refillStock);
-router.get("/cafeteria/stock/refill-history",       authorize("admin"), getRefillHistory);
-router.get("/cafeteria/consumption",                authorize("admin"), getConsumptionByDate);
-router.post("/cafeteria/consumption",               authorize("admin"), createConsumption);
+router.post("/cafeteria/stock/:id/refill",          authorize("admin", "trainer"), refillStock);
+router.get("/cafeteria/stock/refill-history",       authorize("admin", "trainer"), getRefillHistory);
+router.get("/cafeteria/consumption",                authorize("admin", "trainer"), getConsumptionByDate);
+router.post("/cafeteria/consumption",               authorize("admin", "trainer"), createConsumption);
 
 // ── Member Progress ───────────────────────────────────────────────────────────
 router.post("/member-progress",             authorize("admin", "trainer"), createProgressRecord);
@@ -396,7 +396,7 @@ router.post(
   createSession
 );
 router.get("/progress-photo-session/member/:id", getSessionsByMember);
-router.delete("/progress-photo-session/:id", authorize("admin", "trainer"), deleteSession);
+router.delete("/progress-photo-session/:id", authorize("admin"), deleteSession);
 
 // ── Weight History ───────────────────────────────────────────────────────────
 router.post("/weight-history",             authorize("admin", "trainer"), createWeightHistoryEntry);

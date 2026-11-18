@@ -176,8 +176,13 @@ export const createRegPayment = async (req, res) => {
 // ── Get All Payments ──────────────────────────────────────────────────────────
 export const getAllRegPayments = async (req, res) => {
   try {
-    const payments = await RegPayment.find()
-      .sort({ createdAt: -1 });
+    let payments = await RegPayment.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (req.user?.role === "trainer") {
+      payments = payments.map(p => ({ ...p, memberPhone: "" }));
+    }
 
     return res.status(200).json({
       success: true,
@@ -200,8 +205,13 @@ export const getRegPaymentsByMember = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const payments = await RegPayment.find({ registrationId: req.params.id })
-      .sort({ createdAt: -1 });
+    let payments = await RegPayment.find({ registrationId: req.params.id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (req.user?.role === "trainer") {
+      payments = payments.map(p => ({ ...p, memberPhone: "" }));
+    }
 
     return res.status(200).json({ success: true, payments });
   } catch (err) {

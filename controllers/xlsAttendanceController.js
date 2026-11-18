@@ -77,7 +77,16 @@ export const getAllAttendance = async (req, res) => {
 
     const records = await XlsAttendance.find(filter)
       .populate("registrationId", "name phone emails images")
-      .sort({ month: -1, dept: 1, name: 1 });
+      .sort({ month: -1, dept: 1, name: 1 })
+      .lean();
+
+    if (req.user?.role === "trainer") {
+      records.forEach(r => {
+        if (r.registrationId && r.registrationId.phone) {
+          r.registrationId.phone = "";
+        }
+      });
+    }
 
     return res.status(200).json({ success: true, count: records.length, records });
   } catch (err) {

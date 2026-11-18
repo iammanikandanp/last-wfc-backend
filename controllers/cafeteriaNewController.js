@@ -57,12 +57,13 @@ export const getPendingMembers = async (req, res) => {
     const memberIds = aggregation.map(a => a._id).filter(Boolean);
     const populated = await Registration.find({ _id: { $in: memberIds } }, "name phone images.profileImage");
     
+    const isTrainer = req.user?.role === "trainer";
     const result = aggregation.filter(a => a._id).map(a => {
       const m = populated.find(p => p._id.toString() === a._id.toString());
       return {
         _id: a._id,
         name: m ? m.name : "Unknown",
-        phone: m ? m.phone : "",
+        phone: isTrainer ? "" : (m ? m.phone : ""),
         profileImage: m?.images?.profileImage,
         pendingAmount: a.pendingAmount
       };
@@ -92,6 +93,15 @@ export const getTransactions = async (req, res) => {
       .populate("item", "itemName price")
       .sort({ transactionDate: -1 })
       .lean();
+
+    if (req.user?.role === "trainer") {
+      records.forEach(r => {
+        if (r.member && r.member.phone) {
+          r.member.phone = "";
+        }
+      });
+    }
+
     return res.status(200).json({ success: true, data: records });
   } catch (err) {
     return fmtError(res, err);

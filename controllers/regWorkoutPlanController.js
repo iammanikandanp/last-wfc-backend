@@ -35,7 +35,10 @@ export const createRegWorkoutPlan = async (req, res) => {
 // ── Get All ───────────────────────────────────────────────────────────────────
 export const getAllRegWorkoutPlans = async (req, res) => {
   try {
-    const plans = await RegWorkoutPlan.find({ isActive: true }).sort({ createdAt: -1 });
+    let plans = await RegWorkoutPlan.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    if (req.user?.role === "trainer") {
+      plans = plans.map(p => ({ ...p, memberPhone: "" }));
+    }
     return res.status(200).json({ success: true, count: plans.length, plans });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -45,8 +48,11 @@ export const getAllRegWorkoutPlans = async (req, res) => {
 // ── Get by Member ─────────────────────────────────────────────────────────────
 export const getRegWorkoutPlanByMember = async (req, res) => {
   try {
-    const plan = await RegWorkoutPlan.findOne({ registrationId: req.params.id, isActive: true });
+    let plan = await RegWorkoutPlan.findOne({ registrationId: req.params.id, isActive: true }).lean();
     if (!plan) return res.status(404).json({ success: false, message: "No active workout plan" });
+    if (req.user?.role === "trainer") {
+      plan.memberPhone = "";
+    }
     return res.status(200).json({ success: true, plan });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

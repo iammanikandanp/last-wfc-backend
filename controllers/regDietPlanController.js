@@ -42,7 +42,10 @@ export const createRegDietPlan = async (req, res) => {
 // ── Get All Plans ─────────────────────────────────────────────────────────────
 export const getAllRegDietPlans = async (req, res) => {
   try {
-    const plans = await RegDietPlan.find({ isActive: true }).sort({ createdAt: -1 });
+    let plans = await RegDietPlan.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    if (req.user?.role === "trainer") {
+      plans = plans.map(p => ({ ...p, memberPhone: "" }));
+    }
     return res.status(200).json({ success: true, count: plans.length, plans });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -52,11 +55,14 @@ export const getAllRegDietPlans = async (req, res) => {
 // ── Get Plan by Member ────────────────────────────────────────────────────────
 export const getRegDietPlanByMember = async (req, res) => {
   try {
-    const plan = await RegDietPlan.findOne({
+    let plan = await RegDietPlan.findOne({
       registrationId: req.params.id,
       isActive: true,
-    });
+    }).lean();
     if (!plan) return res.status(404).json({ success: false, message: "No active diet plan" });
+    if (req.user?.role === "trainer") {
+      plan.memberPhone = "";
+    }
     return res.status(200).json({ success: true, plan });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

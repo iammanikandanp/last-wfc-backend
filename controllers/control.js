@@ -172,6 +172,21 @@ export const fetch = async (req, res) => {
   try {
     // Exclude blocked members from general fetch lists — blocked members are only visible via block-list
     const fetchAll = await Registration.find({ status: { $ne: "blocked" } }).lean();
+    if (req.user?.role === "trainer") {
+      const sanitized = fetchAll.map(m => ({
+        ...m,
+        phone: "",
+        address: "",
+        pincode: "",
+        images: {
+          profileImage: m.images?.profileImage || "",
+          frontBodyImage: "",
+          sideBodyImage: "",
+          backBodyImage: "",
+        }
+      }));
+      return res.status(200).json({ message: "fetch all data", data: sanitized });
+    }
     res.status(200).json({ message: "fetch all data", data: fetchAll });
   } catch (err) {
     console.log("fetch error:", err);
@@ -211,6 +226,22 @@ export const updatereg = async (req, res) => {
       return res.status(404).json({ message: "Member not found" });
     }
 
+    const isTrainer = req.user?.role === "trainer";
+
+    // Prevent trainers from altering isTop10
+    if (isTrainer && isTop10 !== undefined) {
+      const requestedTop10 = (isTop10 === 'true' || isTop10 === true);
+      if (requestedTop10 !== existing.isTop10) {
+        return res.status(403).json({ message: "Trainers cannot modify Top 10 status" });
+      }
+    }
+
+    // Preserve existing phone, address, pincode if trainer
+    const finalPhone = isTrainer ? existing.phone : (phone !== undefined ? phone : existing.phone);
+    const finalAddress = isTrainer ? existing.address : (address !== undefined ? address : existing.address);
+    const finalPincode = isTrainer ? existing.pincode : (pincode !== undefined ? pincode : existing.pincode);
+    const finalIsTop10 = isTrainer ? existing.isTop10 : (isTop10 !== undefined ? (isTop10 === 'true' || isTop10 === true) : existing.isTop10);
+
     // Use new image if uploaded, otherwise keep existing
     const profileImage   = req.files?.profileImage?.[0]?.path   || existing.images?.profileImage   || "";
     const frontBodyImage = req.files?.frontBodyImage?.[0]?.path || existing.images?.frontBodyImage || "";
@@ -245,19 +276,38 @@ export const updatereg = async (req, res) => {
 
     const updateData = {
       name, age, gender, emails, height, weight, bmi, bloodGroup,
-      issues, description, profession, phone, address, pincode,
+      issues, description, profession,
+      phone: finalPhone,
+      address: finalAddress,
+      pincode: finalPincode,
       packages, duration, services, startDate, endDate,
       bodyFat, waist, neck, hip, sugarLevel, bloodPressure,
       attendanceId,
       personalTraining, customWorkout, customDiet, rehabTherapy,
       statusLevel, goal: goal !== undefined ? goal : existing.goal,
-      isTop10: isTop10 !== undefined ? (isTop10 === 'true' || isTop10 === true) : existing.isTop10,
+      isTop10: finalIsTop10,
       images: { profileImage, frontBodyImage, sideBodyImage, backBodyImage },
       dateOfBirth: formattedDOB,
       password: newPassword,
     };
 
     const updatedUser = await Registration.findByIdAndUpdate(id, updateData, { new: true });
+
+    if (isTrainer) {
+      const userObj = updatedUser.toObject ? updatedUser.toObject() : { ...updatedUser };
+      userObj.phone = "";
+      userObj.address = "";
+      userObj.pincode = "";
+      if (userObj.images) {
+        userObj.images = {
+          profileImage: userObj.images.profileImage || "",
+          frontBodyImage: "",
+          sideBodyImage: "",
+          backBodyImage: "",
+        };
+      }
+      return res.status(200).json({ message: "Updated successfully", data: userObj });
+    }
 
     return res.status(200).json({ message: "Updated successfully", data: updatedUser });
   } catch (err) {
@@ -299,6 +349,22 @@ export const fetchOne = async (req, res) => {
     // Auto-resume if 30-day hold period has completed
     if (user.isOnHold && user.scheduledResumeDate && new Date(user.scheduledResumeDate) <= new Date()) {
       user = await resumeMemberHold(user, "system");
+    }
+
+    if (req.user?.role === "trainer") {
+      const userObj = user.toObject ? user.toObject() : { ...user };
+      userObj.phone = "";
+      userObj.address = "";
+      userObj.pincode = "";
+      if (userObj.images) {
+        userObj.images = {
+          profileImage: userObj.images.profileImage || "",
+          frontBodyImage: "",
+          sideBodyImage: "",
+          backBodyImage: "",
+        };
+      }
+      return res.status(200).json({ message: "fetch one data", data: userObj });
     }
 
     res.status(200).json({ message: "fetch one data", data: user });
